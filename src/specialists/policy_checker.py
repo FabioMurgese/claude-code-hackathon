@@ -7,6 +7,11 @@ Returns: PolicyResult dict.
 Graph: HumanMessage → llm_node ↔ safe_tools (cycle) → end_turn → return JSON.
 Context isolation: fresh state per invocation.
 
+## Key Decision
+_llm is initialised lazily (None at import time) so that importing this module
+does not require AWS credentials. Credentials are only resolved on the first
+actual run_policy_checker() call.
+
 Owner: Person B
 """
 
@@ -49,7 +54,14 @@ _tools = [
     StructuredTool.from_function(check_sanctions, name="check_sanctions", description="Controlla lista sanzioni EU/UN"),
 ]
 _safe_tools = SafeToolNode(_tools)
-_llm = build_chat_model().bind_tools(_tools)
+_llm = None  # lazy — built on first call to avoid import-time AWS credential check
+
+
+def _get_llm():
+    global _llm
+    if _llm is None:
+        _llm = build_chat_model().bind_tools(_tools)
+    return _llm
 
 
 class _State(TypedDict):
@@ -57,7 +69,7 @@ class _State(TypedDict):
 
 
 def _llm_node(state: _State) -> dict:
-    response = _llm.invoke(state["messages"])
+    response = _get_llm().invoke(state["messages"])
     if isinstance(response, AIMessage):
         meta = response.response_metadata or {}
         if meta.get("stop_reason") == "max_tokens":

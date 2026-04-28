@@ -34,7 +34,7 @@ def test_fast_track_decision(tmp_path, monkeypatch):
     with (
         patch("src.agent.coordinator.run_document_reader", return_value=_DOC),
         patch("src.agent.coordinator.run_policy_checker", return_value=_POL),
-        patch("src.agent.coordinator._llm", _mock_llm(_FAST_JSON)),
+        patch("src.agent.coordinator._get_llm", return_value=_mock_llm(_FAST_JSON)),
     ):
         result = process_claim("CLM-001")
     assert result["decision"] == "fast_track"
@@ -53,7 +53,7 @@ def test_high_amount_escalates(tmp_path, monkeypatch):
     with (
         patch("src.agent.coordinator.run_document_reader", return_value=doc_high),
         patch("src.agent.coordinator.run_policy_checker", return_value=_POL),
-        patch("src.agent.coordinator._llm", _mock_llm(dec_json)),
+        patch("src.agent.coordinator._get_llm", return_value=_mock_llm(dec_json)),
     ):
         result = process_claim("CLM-010")
     assert result["status"] == "pending_human_review"
@@ -77,7 +77,7 @@ def test_validation_retry_on_bad_json(tmp_path, monkeypatch):
     with (
         patch("src.agent.coordinator.run_document_reader", return_value=_DOC),
         patch("src.agent.coordinator.run_policy_checker", return_value=_POL),
-        patch("src.agent.coordinator._llm", mock_llm),
+        patch("src.agent.coordinator._get_llm", return_value=mock_llm),
     ):
         result = process_claim("CLM-001")
     assert result["decision"] == "fast_track"

@@ -14,6 +14,10 @@ than tool calls. This avoids coordinator tool-binding complexity and keeps
 write_decision / escalate_claim as pure Python side-effects, making the
 validation-retry loop straightforward to implement as a graph cycle.
 
+_llm is initialised lazily (None at import time) so that importing this module
+does not require AWS credentials. Credentials are only resolved on the first
+actual process_claim() call.
+
 Owner: Person B
 """
 
@@ -45,7 +49,14 @@ DECISIONI:
 Restituisci SOLO un JSON con: claim_id, decision, category, confidence (0.0-1.0), rationale.
 Non includere Codice Fiscale, Partita IVA o IBAN nella motivazione."""
 
-_llm = build_chat_model()
+_llm = None  # lazy — built on first call to avoid import-time AWS credential check
+
+
+def _get_llm():
+    global _llm
+    if _llm is None:
+        _llm = build_chat_model()
+    return _llm
 
 
 class CoordinatorState(TypedDict):
@@ -95,7 +106,7 @@ def _synthesize(state: CoordinatorState) -> dict:
     if state.get("last_validation_error"):
         prompt_parts.append(f"Errore precedente: {state['last_validation_error']}. Correggi.")
     msgs = [SystemMessage(content=_SYSTEM), HumanMessage(content="\n".join(prompt_parts))]
-    response = _llm.invoke(msgs)
+    response = _get_llm().invoke(msgs)
     return {"messages": [response]}
 
 
