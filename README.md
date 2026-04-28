@@ -2,8 +2,8 @@
 
 ## Participants
 - Fabio — PM/BA · Architect · Tool implementation · Presentation pipeline
-- Matteo — Architect · Core agent (coordinator, loop, specialists) · Integration
-- Luca — Quality · Guardrails (PreToolUse hook) · Adversarial eval set · Scorecard
+- Luca — Architect · Core agent (coordinator, loop, specialists) · Integration
+- Matteo — Quality · Guardrails (PreToolUse hook) · Adversarial eval set · Scorecard
 
 ## Scenario
 Scenario 5: Agentic Solution — **Insurance Claims Intake Agent (Italian/EU market)**

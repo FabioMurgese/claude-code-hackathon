@@ -12,7 +12,7 @@
 
 | Trigger | Reason |
 |---|---|
-| `amount_eur >= 5000` | Dollar impact too high for autonomous decision |
+| `amount_eur >= 5000` | Euro impact too high for autonomous decision |
 | `confidence < 0.75` | Model uncertainty — human review required |
 | `fraud_score > 0` | Any D.Lgs. 231/2001 indicator present |
 | `sanctions_hit == true` | EU or UN sanctions list match on claimant |
