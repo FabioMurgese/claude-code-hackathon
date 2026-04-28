@@ -1,5 +1,6 @@
 import json
 from unittest.mock import patch
+from langchain_core.messages import AIMessage
 from src.specialists.document_reader import run_document_reader
 
 _MOCK_SUMMARY = {
@@ -11,8 +12,9 @@ _MOCK_SUMMARY = {
 
 
 def test_returns_parsed_claim_summary():
-    with patch("src.specialists.document_reader.run_agent_loop",
-               return_value=json.dumps(_MOCK_SUMMARY)):
+    mock_state = {"messages": [AIMessage(content=json.dumps(_MOCK_SUMMARY))]}
+    with patch("src.specialists.document_reader._graph") as mock_graph:
+        mock_graph.invoke.return_value = mock_state
         result = run_document_reader("CLM-001")
     assert result["claim_id"] == "CLM-001"
     assert result["amount_eur"] == 800.0
