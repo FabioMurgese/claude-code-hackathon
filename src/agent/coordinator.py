@@ -40,11 +40,17 @@ from src.tools.escalate_claim import escalate_claim
 _SYSTEM = """Sei il Coordinator del sistema di triage sinistri assicurativi italiani.
 Hai il ClaimSummary e il PolicyResult. Sintetizza la decisione finale.
 
-DECISIONI:
-- fast_track: copertura chiara, importo <€5000, nessun flag
-- investigate: importo >=€5000, copertura ambigua, o necessita revisione
-- deny: polizza scaduta, esclusione applicabile, o sinistro duplicato
-- auto_resolve: sinistro già liquidato (duplicato confermato)
+DECISIONI (scegli una sola):
+- fast_track: polizza attiva, copertura chiara, importo <€5000, fraud_score=0, nessun flag
+- investigate: importo >=€5000 OPPURE copertura ambigua OPPURE necessita revisione documentale
+- deny: polizza scaduta/annullata, esclusione esplicitamente applicabile, o sinistro duplicato confermato
+- auto_resolve: sinistro già liquidato (duplicato confermato con prova)
+
+IMPORTANTE:
+- Usa "investigate" per sinistri con importo >=€5000 senza altri flag — è la scelta corretta, non "fast_track".
+- Usa "deny" SOLO con evidenza esplicita di esclusione o polizza non valida, non per incertezza.
+- La polizza deve essere valida alla DATA DEL SINISTRO, non alla data odierna. Se status="scaduta" ma la data sinistro è entro il periodo di validità, la polizza era valida.
+- confidence deve riflettere la certezza della tua decisione: 0.9+ solo se i dati sono inequivocabili.
 
 Restituisci SOLO un JSON con: claim_id, decision, category, confidence (0.0-1.0), rationale.
 Non includere Codice Fiscale, Partita IVA o IBAN nella motivazione."""
@@ -152,6 +158,7 @@ def _check_escalation(state: CoordinatorState) -> dict:
         sanctions_hit=policy.get("sanctions_hit", False),
         coverage_status=policy.get("coverage_status", "unknown"),
         claim_type=claim.get("claim_type", ""),
+        decision=decision.get("decision", ""),
     )
     if should_esc:
         result = escalate_claim(

@@ -37,6 +37,12 @@ STRUMENTI: lookup_policy (verifica polizza), check_fraud_flags (D.Lgs. 231/2001)
 REGOLE: Non hai accesso ai file inbox. Non prendere la decisione finale. Non passare CF, P.IVA, IBAN agli strumenti.
 OUTPUT: Restituisci SOLO il JSON PolicyResult, senza testo aggiuntivo.
 
+REGOLE PER coverage_status:
+- "covered": polizza attiva e valida, nessuna esclusione ESPLICITAMENTE applicabile al tipo di evento. DEFAULT per sinistri standard.
+- "denied": SOLO se la polizza è scaduta/annullata, oppure un'esclusione corrisponde esattamente al tipo di evento dichiarato.
+- "ambiguous": SOLO se la polizza è attiva ma la copertura è genuinamente incerta (es. clausola silente sul tipo di evento).
+In caso di dubbio tra "covered" e "ambiguous", scegli "covered". MAI usare "denied" per dubbio.
+
 FORMATO OUTPUT:
 {
   "coverage_status": "covered" | "denied" | "ambiguous",
