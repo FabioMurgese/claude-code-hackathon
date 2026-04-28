@@ -19,6 +19,7 @@ Owner: Track A (Fabio)
 """
 import argparse
 import json
+import os
 import pathlib
 
 import anthropic
@@ -26,7 +27,15 @@ import anthropic
 INBOX = pathlib.Path("data/inbox")
 EVAL  = pathlib.Path("data/eval")
 
-client = anthropic.Anthropic()
+# Bedrock cross-region inference profile for Claude Sonnet in EU.
+# Override with BEDROCK_MODEL_ID env var if your account uses a different profile/region.
+_DEFAULT_BEDROCK_MODEL = os.getenv(
+    "BEDROCK_MODEL_ID",
+    "eu.anthropic.claude-sonnet-4-5-20251001-v1:0",
+)
+
+client = anthropic.AnthropicBedrock()
+MODEL  = _DEFAULT_BEDROCK_MODEL
 
 _NORMAL_PROMPT = """Genera {count} sinistri assicurativi italiani sintetici in formato JSONL.
 Ogni riga è un oggetto JSON con esattamente questi campi:
@@ -73,7 +82,7 @@ Output: SOLO JSONL puro, nessun testo aggiuntivo."""
 
 def _call_claude(prompt: str) -> list[dict]:
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=MODEL,
         max_tokens=8192,
         messages=[{"role": "user", "content": prompt}],
     )

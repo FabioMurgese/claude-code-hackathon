@@ -20,7 +20,7 @@ def run_agent_loop(
     tool_functions: dict,
     messages: list[dict],
     pre_tool_hook=None,
-    model: str = "claude-sonnet-4-6",
+    model: str = "eu.anthropic.claude-sonnet-4-5-20251001-v1:0",
     max_tokens: int = 4096,
 ) -> str:
     """Run one isolated agent until end_turn or error. Implemented in Track B."""
