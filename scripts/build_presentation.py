@@ -615,7 +615,8 @@ def build(out_path: Path) -> None:
     Start the demo server first, then click <strong>▶ Run</strong> on any panel.
   </p>
   <pre style="font-size:.78rem;margin-bottom:1.2rem;display:inline-block"><code>aws login &amp;&amp; source .env
-.venv/bin/python scripts/demo_server.py   # keep this running</code></pre>
+.venv/bin/python scripts/demo_server.py
+# then open:  http://localhost:7331  (not the file directly)</code></pre>
   <div class="demo-grid">
 
     <!-- Scenario 1: fast_track -->
