@@ -31,10 +31,11 @@ EVAL  = pathlib.Path("data/eval")
 # Override with BEDROCK_MODEL_ID env var if your account uses a different profile/region.
 _DEFAULT_BEDROCK_MODEL = os.getenv(
     "BEDROCK_MODEL_ID",
-    "eu.anthropic.claude-sonnet-4-5-20251001-v1:0",
+    "eu.anthropic.claude-opus-4-7",
 )
 
-client = anthropic.AnthropicBedrock()
+_AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-north-1"))
+client = anthropic.AnthropicBedrock(aws_region=_AWS_REGION)
 MODEL  = _DEFAULT_BEDROCK_MODEL
 
 _NORMAL_PROMPT = """Genera {count} sinistri assicurativi italiani sintetici in formato JSONL.
