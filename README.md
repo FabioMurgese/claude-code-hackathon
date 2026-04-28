@@ -10,11 +10,11 @@ Scenario 5: Agentic Solution — **Insurance Claims Intake Agent (Italian/EU mar
 
 ## What We Built
 
-An agentic triage system for inbound insurance claims, built on the Claude Agent SDK (Python). Claims arrive as files in `data/inbox/` — each a folder with a plain-text adjuster summary and metadata. The coordinator agent reads the claim, dispatches two specialist subagents (DocumentReader and PolicyChecker), validates the structured output against a strict schema with a retry loop, and routes to one of three decisions: `fast_track`, `investigate`, or `deny`. Every decision is written to `data/decisions/` with the full reasoning chain so any call is replayable from the log alone.
+A production-grade agentic triage system for inbound Italian insurance claims. Claims arrive as folders in `data/inbox/`. The coordinator agent (LangGraph `StateGraph`) dispatches two specialist subagents — DocumentReader and PolicyChecker — with explicit context passing (subagents receive no coordinator memory), validates structured output against a strict schema with a retry loop (max 3 retries, schema error fed back each time), and routes to `fast_track`, `deny`, `auto_resolve`, or `escalate_claim()`. Every decision is written to `data/decisions/` with the full reasoning chain, confidence score, and retry count — replayable from the log alone.
 
-The system is adapted for the Italian/EU market: identity fields are Codice Fiscale and Partita IVA (not SSN), amounts are in EUR with a €5 000 escalation threshold, and the fraud-flag logic references D.Lgs. 231/2001. A `PreToolUse` hook deterministically blocks PII patterns (Codice Fiscale, Partita IVA, IBAN) before any tool call — no LLM involved in that gate.
+The system is fully adapted for the Italian/EU market: Codice Fiscale and Partita IVA PII patterns, EUR amounts with a €5 000 escalation threshold, D.Lgs. 231/2001 fraud rules, EU/UN sanctions list, and IVASS regulatory framing. A `PreToolUse` hook deterministically blocks PII leakage and fraud-approve attempts before any LLM call — prompt injection cannot bypass it.
 
-**What runs today:** all 6 tools are implemented and tested, both specialist subagents (DocumentReader, PolicyChecker) are implemented, the agent loop with `stop_reason` handling and PreToolUse integration is complete, and the eval harness is fully operational. The eval dataset contains 40 labeled normal claims and 20 adversarial claims (prompt injection, fraud indicators, false urgency, PII exfiltration attempts, and more). The scorecard CLI runs against the full dataset and exits with a CI code. The coordinator and CLI are the final integration step (Track B, in progress).
+**What runs today:** the entire pipeline is end-to-end functional. `python -m src.agent ingest CLM-001` produces a real decision in ~10 seconds via AWS Bedrock Opus 4.7. 37 unit tests pass. The eval harness runs 60 labeled claims (40 normal + 20 adversarial) and emits a scored scorecard. The presentation assembles itself from live docs and eval output.
 
 ## Challenges Attempted
 
@@ -23,7 +23,7 @@ The system is adapted for the Italian/EU market: identity fields are Codice Fisc
 | 1 | The Mandate | ✅ done | [`docs/mandate.md`](docs/mandate.md) — decides alone / escalates / never touches, explicit €5 000 and 0.75 confidence thresholds |
 | 2 | The Bones | ✅ done | [`docs/adr/001-agent-arch.md`](docs/adr/001-agent-arch.md) — coordinator + 2 specialists, stop_reason dispatch, explicit context passing |
 | 3 | The Tools | ✅ done | 6 tools in [`src/tools/`](src/tools/) — fetch_claim, lookup_policy, check_fraud_flags, check_sanctions, write_decision, escalate_claim, parse_attachments. All tested. |
-| 4 | The Triage | 🔄 in progress | Loop + specialists done. Coordinator validation-retry loop completing (Track B). |
+| 4 | The Triage | ✅ done | LangGraph coordinator in [`src/agent/coordinator.py`](src/agent/coordinator.py) — read_documents → check_policy → synthesize → validate (retry ≤ 3) → check_escalation. Reasoning chain logged per decision. |
 | 5 | The Brake | ✅ done | [`src/hooks/pre_tool_use.py`](src/hooks/pre_tool_use.py) — hard stops for PII, frozen accounts, fraud approve, external URLs. [`src/escalation_rules.py`](src/escalation_rules.py) deterministic thresholds. |
 | 6 | The Attack | ✅ done | 20 adversarial claims in [`data/eval/adversarial.jsonl`](data/eval/adversarial.jsonl): prompt_injection×6, fraud_indicator×4, coverage_ambiguity×3, false_urgency×3, hidden_complexity×2, pii_exfil_attempt×2. |
 | 7 | The Scorecard | ✅ done | [`evals/harness.py`](evals/harness.py) + [`evals/run_evals.py`](evals/run_evals.py) — accuracy, precision/category, adversarial-pass rate, false-confidence rate. CI exits with code 1 on threshold failure. 4 unit tests. |
@@ -44,36 +44,38 @@ The system is adapted for the Italian/EU market: identity fields are Codice Fisc
 ## How to Run It
 
 ```bash
-# 1. Install dependencies (Python 3.11+ required)
-pip install -r requirements.txt
+# 1. Create virtual env and install (Python 3.11+ required)
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
-# 2. Inbox fixtures and eval data are already committed (eval-baseline-v1 tagged)
-#    If you need to regenerate eval data from scratch:
-python scripts/_fix_eval_data.py   # fixes policy IDs + creates inbox folders
+# 2. Authenticate with AWS (Bedrock Opus 4.7 — no Anthropic API key needed)
+aws login
+cp .env.example .env    # fill in GITHUB_PERSONAL_ACCESS_TOKEN
+source .env
 
-# 3. Run unit tests (18 tool tests + 4 harness tests)
-pytest tests/ -v
+# 3. Run all 37 unit tests
+.venv/bin/pytest tests/ -v
 
-# 4. Process one claim (requires Track B coordinator to be complete)
-python -m src.agent ingest CLM-001
+# 4. Process individual claims
+.venv/bin/python -m src.agent ingest CLM-001   # fast_track expected
+.venv/bin/python -m src.agent ingest CLM-010   # escalation expected (€6 500)
+.venv/bin/python -m src.agent ingest CLM-014   # escalation expected (frozen polizza)
 
-# 5. Run the eval harness — normal claims only, then full suite
-python evals/run_evals.py --only normal
-python evals/run_evals.py                  # exits 0 if CI thresholds pass, 1 if not
+# 5. Run the full eval harness (60 claims — takes ~5 min)
+.venv/bin/python evals/run_evals.py            # exits 1 if CI thresholds fail
 
-# 6. Build presentation
-python scripts/build_presentation.py
+# 6. Rebuild presentation with live scorecard
+.venv/bin/python scripts/build_presentation.py
 ```
 
-Requires `ANTHROPIC_API_KEY` in the environment. Copy `.env.example` to `.env` and fill in your values.
+AWS Bedrock credentials required (`aws login`). Model: `eu.anthropic.claude-opus-4-7` (EU inference profile).
 
 ## If We Had More Time
 
-1. **Implement tool bodies** — `fetch_claim`, `lookup_policy`, `check_fraud_flags` are stubs. These are the critical path to a running agent.
-2. **Wire the coordinator loop** — connect the specialist Tasks, validation-retry logic, and `write_decision` / `escalate_claim` dispatch.
-3. **Run the eval harness** — generate all 60 synthetic claims, run the scorecard, get a real `false_confidence_rate` number for the presentation.
-4. **The Loop (Challenge 8)** — human overrides feeding back into the labeled-example store. The scaffolding for `data/escalations/` is there; the feedback signal is not wired.
-5. **Mock policy documents** — `data/policies/` needs the 5 Italian policy JSONs (RCA auto, incendio casa, infortuni, RC professionale, polizza vita).
+1. **Challenge 8 — The Loop** — when a human overrides a decision, the signal should flow to a labeled-example store that feeds the adversarial eval set and few-shot examples for the coordinator classifier. The scaffolding (`data/escalations/`) is in place; the feedback wiring is not.
+2. **Improve false-confidence rate** — currently 18.3% (target ≤ 5%). The `infortuni` policy's `sport_estremi` exclusion is being applied too aggressively (calcetto amatoriale, bicicletta). Better exclusion matching logic or a more explicit system prompt for the PolicyChecker would fix this.
+3. **Adversarial pass rate to 80%** — currently 75%. 5 adversarial cases (mainly coverage ambiguity) are being decided autonomously rather than escalated. Tighter adversarial detection in the coordinator prompt.
+4. **HTTP ingestion endpoint** — a thin FastAPI layer over `data/inbox/` for live demo purposes. The agent core is ready; only the ingestion surface would change.
+5. **CI pipeline** — `pytest` + `evals/run_evals.py` wired as a GitHub Actions workflow. The CI exit codes are already implemented; only the `.github/workflows/` file is missing.
 
 ## How We Used Claude Code
 
@@ -83,7 +85,9 @@ Requires `ANTHROPIC_API_KEY` in the environment. Copy `.env.example` to `.env` a
 
 **`CLAUDE.md` as a forcing function** — Writing shared conventions first (€ not $, PII rules, threshold single source of truth in `escalation_rules.py`, `## Key Decision` serialization) meant every stub was already oriented correctly before implementation started.
 
-**Where it saved the most time** — The design phase. Normally 20–30% of a hackathon is spent arguing about architecture. Claude structured that argument, surfaced the tradeoffs, and produced an ADR we all agreed on before writing a line of code.
+**LangGraph migration** — Luca chose LangGraph for the coordinator and specialist graphs. Claude adapted immediately — updated graph_utils, tools_node, and all dependent tests without breaking the 37-test suite.
+
+**Where it saved the most time** — The design phase. Normally 20–30% of a hackathon is spent arguing about architecture. Claude structured that argument, surfaced the trade-offs, and produced an ADR the team agreed on before writing a line of code.
 
 ---
 

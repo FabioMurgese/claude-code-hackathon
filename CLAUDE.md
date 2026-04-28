@@ -16,20 +16,26 @@ Built with the Claude Agent SDK (Python). Scenario 5 of the Claude Code Hackatho
 - `main` is always demo-ready. Merge only when a challenge is complete.
 - Branch naming: `feat/<challenge-name>` (e.g. `feat/triage-agent`, `feat/guardrails`)
 
+## Stack
+- Agent framework: **LangGraph** (`StateGraph`) via `langchain-aws` + `ChatBedrockConverse`
+- AWS Bedrock inference profile: `eu.anthropic.claude-opus-4-7` (set in `src/agent/graph_utils.py`)
+- Credentials: AWS CLI (`aws login`), loaded from environment. No `ANTHROPIC_API_KEY` needed.
+
 ## Running the agent
 ```bash
-pip install -e ".[dev]"
-python -m src.agent ingest <claim_id>        # process one claim
-python evals/run_evals.py                    # run full eval suite
-python scripts/build_presentation.py         # assemble presentation.html
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+aws login && source .env                     # AWS credentials + GITHUB_PAT
+.venv/bin/python -m src.agent ingest <claim_id>        # process one claim
+.venv/bin/python evals/run_evals.py                    # run full eval suite
+.venv/bin/python scripts/build_presentation.py         # assemble presentation.html
 ```
 
 ## Data directories
-- `data/inbox/` — 15 development fixtures. Do not use for eval scoring.
-- `data/eval/` — eval dataset, tagged eval-baseline-v1. Never edit after tagging.
+- `data/inbox/` — 15 dev fixtures (CLM-001..015) + 60 eval fixtures (SIN-EVAL-*, EVAL-A-*). Do not use eval folders for debugging.
+- `data/eval/` — 40 normal + 20 adversarial labeled claims. Tagged `eval-baseline-v1`.
 - `data/decisions/` — agent writes decision JSON here at runtime (gitignored).
 - `data/escalations/` — human review queue (gitignored).
-- `data/policies/` — 5 mock Italian policy JSON files.
+- `data/policies/` — 5 mock Italian policy JSON files (RCA_auto, incendio_casa, infortuni, RC_professionale, polizza_vita).
 
 ## Key decisions log
 Every non-obvious architectural choice is documented in a `## Key Decision` section
