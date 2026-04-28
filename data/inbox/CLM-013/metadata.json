@@ -1,0 +1,11 @@
+{
+  "policy_id": "incendio_casa",
+  "amount_eur": 2200.0,
+  "claim_type": "incendio",
+  "claimant_id": "CLT-013",
+  "frozen": false,
+  "numero_sinistro": "NS-2024-013",
+  "incident_date": "2023-12-01",
+  "in_contenzioso": false,
+  "claim_id": "CLM-013"
+}

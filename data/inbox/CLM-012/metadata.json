@@ -1,0 +1,11 @@
+{
+  "policy_id": "RCA_auto",
+  "amount_eur": 4800.0,
+  "claim_type": "contestazione",
+  "claimant_id": "CLT-012",
+  "frozen": false,
+  "numero_sinistro": "NS-2024-012",
+  "incident_date": "2024-01-25",
+  "in_contenzioso": false,
+  "claim_id": "CLM-012"
+}

@@ -1,0 +1,11 @@
+{
+  "policy_id": "RCA_auto",
+  "amount_eur": 3300.0,
+  "claim_type": "sinistro_auto",
+  "claimant_id": "CLT-014",
+  "frozen": true,
+  "numero_sinistro": "NS-2024-014",
+  "incident_date": "2024-11-30",
+  "in_contenzioso": false,
+  "claim_id": "CLM-014"
+}

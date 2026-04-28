@@ -1,0 +1,11 @@
+{
+  "policy_id": "polizza_vita",
+  "amount_eur": 500.0,
+  "claim_type": "rimborso_spese",
+  "claimant_id": "CLT-005",
+  "frozen": false,
+  "numero_sinistro": "NS-2024-005",
+  "incident_date": "2024-07-01",
+  "in_contenzioso": false,
+  "claim_id": "CLM-005"
+}

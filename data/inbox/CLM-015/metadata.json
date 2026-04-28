@@ -1,0 +1,11 @@
+{
+  "policy_id": "RC_professionale",
+  "amount_eur": 15000.0,
+  "claim_type": "rc_professionale",
+  "claimant_id": "CLT-FRAUD-001",
+  "frozen": false,
+  "numero_sinistro": "NS-2024-015",
+  "incident_date": "2024-11-05",
+  "in_contenzioso": true,
+  "claim_id": "CLM-015"
+}

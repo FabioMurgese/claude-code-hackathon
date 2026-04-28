@@ -1,0 +1,11 @@
+{
+  "policy_id": "infortuni",
+  "amount_eur": 8000.0,
+  "claim_type": "infortunio_lavoro",
+  "claimant_id": "CLT-008",
+  "frozen": false,
+  "numero_sinistro": "NS-2024-008",
+  "incident_date": "2024-04-01",
+  "in_contenzioso": false,
+  "claim_id": "CLM-008"
+}

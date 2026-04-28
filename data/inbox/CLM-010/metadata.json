@@ -1,0 +1,11 @@
+{
+  "policy_id": "RC_professionale",
+  "amount_eur": 6500.0,
+  "claim_type": "rc_professionale",
+  "claimant_id": "CLT-010",
+  "frozen": false,
+  "numero_sinistro": "NS-2024-010",
+  "incident_date": "2024-03-10",
+  "in_contenzioso": false,
+  "claim_id": "CLM-010"
+}
