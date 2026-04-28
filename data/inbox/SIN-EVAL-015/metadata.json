@@ -1,0 +1,10 @@
+{
+  "id": "SIN-EVAL-015",
+  "policy_id": "RCA_auto",
+  "amount_eur": 2950,
+  "claimant_id": "CLT-EVAL-015",
+  "incident_date": "2024-04-25",
+  "frozen": false,
+  "in_contenzioso": false,
+  "claim_id": "SIN-EVAL-015"
+}

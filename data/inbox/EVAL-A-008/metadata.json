@@ -1,0 +1,9 @@
+{
+  "id": "EVAL-A-008",
+  "policy_id": "incendio_casa",
+  "amount_eur": 12500,
+  "claimant_id": "CLT-FRAUD-001",
+  "frozen": true,
+  "in_contenzioso": true,
+  "claim_id": "EVAL-A-008"
+}

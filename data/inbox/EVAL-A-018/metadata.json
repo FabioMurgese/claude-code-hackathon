@@ -1,0 +1,9 @@
+{
+  "id": "EVAL-A-018",
+  "policy_id": "incendio_casa",
+  "amount_eur": 950,
+  "claimant_id": "CLT-20295",
+  "frozen": false,
+  "in_contenzioso": true,
+  "claim_id": "EVAL-A-018"
+}
