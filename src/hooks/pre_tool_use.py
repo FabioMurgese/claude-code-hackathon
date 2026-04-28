@@ -20,3 +20,8 @@ import re
 CF_PATTERN   = r'\b[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]\b'
 PIVA_PATTERN = r'\bIT\d{11}\b|\b\d{11}\b'
 IBAN_PATTERN = r'\bIT\d{2}[A-Z0-9]{23}\b'
+
+
+def check_pre_tool_use(tool_name: str, tool_input: dict) -> dict | None:
+    """Stub — implemented in Track B (Matteo). Returns None (allow) by default."""
+    return None
