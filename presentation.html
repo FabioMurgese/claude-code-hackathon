@@ -228,6 +228,35 @@ a { color: var(--ac) }
 .stat-num { font-size: 2rem; font-weight: 900; color: var(--ac); line-height: 1 }
 .stat-lbl { font-size: .75rem; color: var(--text2); margin-top: .3rem }
 
+/* ── TERMINAL ───────────────────────────────────────────── */
+.terminal {
+  background: #1a1a2e; border-radius: var(--r);
+  overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.15);
+}
+.terminal-bar {
+  background: #2d2d42; padding: .55rem .9rem;
+  display: flex; align-items: center; gap: .4rem;
+}
+.t-dot { width: 10px; height: 10px; border-radius: 50% }
+.t-dot.red   { background: #ff5f56 }
+.t-dot.amber { background: #ffbd2e }
+.t-dot.green { background: #27c93f }
+.terminal-label { font-size: .72rem; color: #8888aa; margin-left: .5rem }
+.terminal-body {
+  padding: .9rem 1.1rem; font-family: "SF Mono","Fira Mono",monospace;
+  font-size: .78rem; line-height: 1.75; color: #c8c8e0;
+}
+.t-prompt { color: #6c63ff; font-weight: 700 }
+.t-cmd    { color: #e8e8ff }
+.t-key    { color: #a78bfa }
+.t-str    { color: #86efac }
+.t-num    { color: #fbbf24 }
+.t-green  { color: #34d399; font-weight: 700 }
+.t-amber  { color: #fbbf24; font-weight: 700 }
+.t-red    { color: #f87171; font-weight: 700 }
+.t-dim    { color: #6666888; font-size: .75rem }
+.demo-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.1rem; margin-top: 1.3rem }
+
 footer {
   text-align: center; padding: 2rem var(--pad);
   color: var(--text3); font-size: .76rem; border-top: 1px solid var(--border);
@@ -254,6 +283,7 @@ footer {
   <a href="#problem">Problem</a>
   <a href="#claudecode">Claude Code</a>
   <a href="#system">The System</a>
+  <a href="#demo">Live Demo</a>
   <a href="#results">Results</a>
   <a href="#punchline">Takeaway</a>
   <a href="#team">Team</a>
@@ -261,7 +291,7 @@ footer {
 
 <!-- ══════ 01 · COVER ════════════════════════════════════ -->
 <section class="slide cover" id="cover">
-  <span class="slide-num">01 / 07</span>
+  <span class="slide-num">01 / 08</span>
   <div class="eyebrow">Claude Code Hackathon · Scenario 5 · 3 hours · 3 devs</div>
   <h1 class="hero">What <em>Claude Code</em><br>built today</h1>
   <p class="slide-sub">
@@ -279,7 +309,7 @@ footer {
 
 <!-- ══════ 02 · THE PROBLEM ══════════════════════════════ -->
 <section class="slide slide-alt" id="problem">
-  <span class="slide-num">02 / 07</span>
+  <span class="slide-num">02 / 08</span>
   <div class="eyebrow">The brief — Scenario 5</div>
   <h2 class="slide-title">Inbound claims are drowning a human.<br>Build an agent that decides.</h2>
   <p class="slide-sub">
@@ -333,7 +363,7 @@ footer {
 
 <!-- ══════ 03 · CLAUDE CODE ═══════════════════════════════ -->
 <section class="slide" id="claudecode">
-  <span class="slide-num">03 / 07</span>
+  <span class="slide-num">03 / 08</span>
   <div class="eyebrow">The main point</div>
   <h2 class="slide-title">Claude Code didn't assist the team.<br>Claude Code <em style="color:var(--ac)">was</em> the team.</h2>
   <div class="g2">
@@ -402,7 +432,7 @@ footer {
 
 <!-- ══════ 04 · THE SYSTEM ════════════════════════════════ -->
 <section class="slide slide-alt" id="system">
-  <span class="slide-num">04 / 07</span>
+  <span class="slide-num">04 / 08</span>
   <div class="eyebrow">What got built</div>
   <h2 class="slide-title">Italian insurance claims triage —<br>end-to-end in 3 hours</h2>
   <div class="g2">
@@ -461,9 +491,103 @@ footer {
   </div>
 </section>
 
-<!-- ══════ 05 · RESULTS ═══════════════════════════════════ -->
+<!-- ══════ 05 · LIVE DEMO ═════════════════════════════════ -->
+<section class="slide slide-alt" id="demo">
+  <span class="slide-num">05 / 08</span>
+  <div class="eyebrow">Live demo — run it yourself</div>
+  <h2 class="slide-title">Three claims. Three outcomes.<br>One command each.</h2>
+  <p class="slide-sub" style="margin-bottom:1rem">
+    AWS credentials required: <code>aws login &amp;&amp; source .env</code> — then pick a scenario.
+  </p>
+  <div class="demo-grid">
+
+    <!-- Scenario 1: fast_track -->
+    <div>
+      <p style="font-size:.78rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">✓ Scenario 1 — Fast Track</p>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="t-dot red"></div><div class="t-dot amber"></div><div class="t-dot green"></div>
+          <span class="terminal-label">CLM-001 · RCA auto · €800</span>
+        </div>
+        <div class="terminal-body">
+<span class="t-prompt">$</span> <span class="t-cmd">python -m src.agent ingest CLM-001</span>
+
+<span class="t-dim"># Claim: "Tamponamento lieve in via Roma 12.</span>
+<span class="t-dim">#  Danno paraurti posteriore €800. Polizza RCA</span>
+<span class="t-dim">#  valida, nessuna esclusione applicabile."</span>
+
+<span class="t-key">"decision"</span>:    <span class="t-green">"fast_track"</span>,
+<span class="t-key">"category"</span>:    <span class="t-str">"sinistro_auto"</span>,
+<span class="t-key">"confidence"</span>:  <span class="t-num">0.95</span>,
+<span class="t-key">"retry_count"</span>: <span class="t-num">0</span>,
+<span class="t-key">"rationale"</span>: <span class="t-str">"Copertura chiara,
+  importo €800 sotto soglia €5.000.
+  Nessun flag frode né sanzioni."</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scenario 2: escalation -->
+    <div>
+      <p style="font-size:.78rem;font-weight:700;color:#b07d10;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">⚠ Scenario 2 — Escalation</p>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="t-dot red"></div><div class="t-dot amber"></div><div class="t-dot green"></div>
+          <span class="terminal-label">CLM-010 · RC professionale · €6 500</span>
+        </div>
+        <div class="terminal-body">
+<span class="t-prompt">$</span> <span class="t-cmd">python -m src.agent ingest CLM-010</span>
+
+<span class="t-dim"># Claim: "Errore professionale con danno</span>
+<span class="t-dim">#  a terzi €6.500. Importo sopra soglia.</span>
+<span class="t-dim">#  Clausola interpretabile."</span>
+
+<span class="t-key">"status"</span>: <span class="t-amber">"pending_human_review"</span>,
+<span class="t-key">"escalation_reason"</span>: <span class="t-str">
+  "amount_eur 6500.0 &gt;=
+   threshold 5000.0"</span>,
+<span class="t-key">"tentative_decision"</span>: <span class="t-str">"investigate"</span>,
+<span class="t-key">"confidence"</span>: <span class="t-num">0.82</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scenario 3: adversarial / frozen -->
+    <div>
+      <p style="font-size:.78rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">🛡 Scenario 3 — Guardrail</p>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="t-dot red"></div><div class="t-dot amber"></div><div class="t-dot green"></div>
+          <span class="terminal-label">CLM-014 · frozen polizza</span>
+        </div>
+        <div class="terminal-body">
+<span class="t-prompt">$</span> <span class="t-cmd">python -m src.agent ingest CLM-014</span>
+
+<span class="t-dim"># Claim: "Sinistro auto €3.300.</span>
+<span class="t-dim">#  Polizza contrassegnata come frozen."</span>
+<span class="t-dim">#  PreToolUse hook → write_decision blocked.</span>
+<span class="t-dim">#  Escalation rule → ambiguous coverage.</span>
+
+<span class="t-key">"status"</span>: <span class="t-amber">"pending_human_review"</span>,
+<span class="t-key">"escalation_reason"</span>: <span class="t-str">
+  "coverage_status ambiguous:
+   polizza silente sul tipo
+   di evento"</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <p style="margin-top:1.2rem;font-size:.82rem;color:var(--text3)">
+    Want to try an adversarial case?
+    <code>python -m src.agent ingest EVAL-A-001</code> — contains a prompt injection in the claim body.
+    The agent escalates rather than following the injected instruction.
+  </p>
+</section>
+
+<!-- ══════ 06 · RESULTS ═══════════════════════════════════ -->
 <section class="slide" id="results">
-  <span class="slide-num">05 / 07</span>
+  <span class="slide-num">06 / 08</span>
   <div class="eyebrow">Challenge 7 — The Scorecard</div>
   <h2 class="slide-title">Live eval results — honest numbers</h2>
   <p class="slide-sub">Eval data generated before any agent code existed, git-tagged <code>eval-baseline-v1</code>, never edited (except correcting data generation bugs).</p>
@@ -491,7 +615,7 @@ footer {
 
 <!-- ══════ 06 · PUNCHLINE ════════════════════════════════ -->
 <section class="slide slide-alt" id="punchline">
-  <span class="slide-num">06 / 07</span>
+  <span class="slide-num">07 / 08</span>
   <div class="eyebrow">The takeaway</div>
   <h2 class="slide-title">Claude Code is not autocomplete.<br>It's a collaborative engineering partner.</h2>
   <div class="g2" style="margin-top:1.5rem">
@@ -522,7 +646,7 @@ footer {
 
 <!-- ══════ 07 · TEAM ══════════════════════════════════════ -->
 <section class="slide" id="team">
-  <span class="slide-num">07 / 07</span>
+  <span class="slide-num">08 / 08</span>
   <div class="eyebrow">The Insur-gents</div>
   <h2 class="slide-title">3 devs · 3 hours · 7 challenges done</h2>
   <div class="g3" style="max-width:600px">
@@ -554,7 +678,7 @@ footer {
 
 <footer>
   <strong>The Insur-gents</strong> · Accenture × Anthropic · Claude Code Hackathon · Scenario 5<br>
-  Generated 28 Apr 2026 · 13:17 UTC · <code>python scripts/build_presentation.py</code>
+  Generated 28 Apr 2026 · 13:31 UTC · <code>python scripts/build_presentation.py</code>
 </footer>
 
 </body>
