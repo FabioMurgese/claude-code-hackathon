@@ -469,7 +469,7 @@ def build(out_path: Path) -> None:
 <section class="slide" id="claudecode">
   <span class="slide-num">03 / 08</span>
   <div class="eyebrow">The main point</div>
-  <h2 class="slide-title">Claude Code didn't assist the team.<br>Claude Code <em style="color:var(--ac)">was</em> the team.</h2>
+  <h2 class="slide-title">Claude Code was our<br><em style="color:var(--ac)">engineering partner</em> — not a replacement.</h2>
   <div class="g2">
     <div>
       <div class="feat">
