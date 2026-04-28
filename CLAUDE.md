@@ -2,7 +2,7 @@
 
 ## Project overview
 Insurance claims triage agent for the Italian/EU market. Coordinator + 2 specialists.
-Built with the Claude Agent SDK (Python). Scenario 5 of the Claude Code Hackathon.
+Built with Python · LangGraph · AWS Bedrock. Scenario 5 of the Claude Code Hackathon.
 
 ## Conventions
 - All monetary amounts are in EUR (€). Never use $ symbols.
@@ -18,7 +18,7 @@ Built with the Claude Agent SDK (Python). Scenario 5 of the Claude Code Hackatho
 
 ## Stack
 - Agent framework: **LangGraph** (`StateGraph`) via `langchain-aws` + `ChatBedrockConverse`
-- AWS Bedrock inference profile: `eu.anthropic.claude-opus-4-7` (set in `src/agent/graph_utils.py`)
+- AWS Bedrock inference profile: `eu.anthropic.claude-sonnet-4-6` (set in `src/agent/graph_utils.py`)
 - Credentials: AWS CLI (`aws login`), loaded from environment. No `ANTHROPIC_API_KEY` needed.
 
 ## Running the agent

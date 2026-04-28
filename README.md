@@ -22,7 +22,7 @@ The system is fully adapted for the Italian/EU market: Codice Fiscale and Partit
 |---|---|---|---|
 | 1 | The Mandate | ✅ done | [`docs/mandate.md`](docs/mandate.md) — decides alone / escalates / never touches, explicit €5 000 and 0.75 confidence thresholds |
 | 2 | The Bones | ✅ done | [`docs/adr/001-agent-arch.md`](docs/adr/001-agent-arch.md) — coordinator + 2 specialists, stop_reason dispatch, explicit context passing |
-| 3 | The Tools | ✅ done | 6 tools in [`src/tools/`](src/tools/) — fetch_claim, lookup_policy, check_fraud_flags, check_sanctions, write_decision, escalate_claim, parse_attachments. All tested. |
+| 3 | The Tools | ✅ done | 7 tools in [`src/tools/`](src/tools/) — fetch_claim, lookup_policy, check_fraud_flags, check_sanctions, write_decision, escalate_claim, parse_attachments. All tested. |
 | 4 | The Triage | ✅ done | LangGraph coordinator in [`src/agent/coordinator.py`](src/agent/coordinator.py) — read_documents → check_policy → synthesize → validate (retry ≤ 3) → check_escalation. Reasoning chain logged per decision. |
 | 5 | The Brake | ✅ done | [`src/hooks/pre_tool_use.py`](src/hooks/pre_tool_use.py) — hard stops for PII, frozen accounts, fraud approve, external URLs. [`src/escalation_rules.py`](src/escalation_rules.py) deterministic thresholds. |
 | 6 | The Attack | ✅ done | 20 adversarial claims in [`data/eval/adversarial.jsonl`](data/eval/adversarial.jsonl): prompt_injection×6, fraud_indicator×4, coverage_ambiguity×3, false_urgency×3, hidden_complexity×2, pii_exfil_attempt×2. |
@@ -67,7 +67,7 @@ source .env
 .venv/bin/python scripts/build_presentation.py
 ```
 
-AWS Bedrock credentials required (`aws login`). Model: `eu.anthropic.claude-opus-4-7` (EU inference profile).
+AWS Bedrock credentials required (`aws login`). Model: `eu.anthropic.claude-sonnet-4-6` (EU inference profile).
 
 ## If We Had More Time
 
@@ -86,6 +86,8 @@ AWS Bedrock credentials required (`aws login`). Model: `eu.anthropic.claude-opus
 **`CLAUDE.md` as a forcing function** — Writing shared conventions first (€ not $, PII rules, threshold single source of truth in `escalation_rules.py`, `## Key Decision` serialization) meant every stub was already oriented correctly before implementation started.
 
 **LangGraph migration** — Luca chose LangGraph for the coordinator and specialist graphs. Claude adapted immediately — updated graph_utils, tools_node, and all dependent tests without breaking the 37-test suite.
+
+**Self-assembling presentation** — `scripts/build_presentation.py` reads `docs/mandate.md`, the ADR, `evals/scorecard.json`, and live decision records to produce `presentation.html`. Every re-run reflects the current state of the agent. The `## Key Decision` sections written throughout the session are extracted automatically as callouts — the process documented itself.
 
 **Where it saved the most time** — The design phase. Normally 20–30% of a hackathon is spent arguing about architecture. Claude structured that argument, surfaced the trade-offs, and produced an ADR the team agreed on before writing a line of code.
 
