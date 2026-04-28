@@ -58,6 +58,82 @@ def _metric_row(label, value, threshold="", ok=None):
     return f"<tr><td>{label}</td><td class='val'>{value}</td><td>{threshold}{badge}</td></tr>"
 
 
+# JavaScript lives in a plain Python string (not an f-string) so newlines
+# and braces are never misinterpreted by Python's f-string parser.
+DEMO_JS = r"""
+const SERVER = 'http://localhost:7331';
+
+function colourClass(val) {
+  if (typeof val !== 'string') return '';
+  if (val === 'fast_track' || val === 'auto_resolve') return 't-green';
+  if (val === 'deny') return 't-red';
+  if (val === 'pending_human_review') return 't-amber';
+  return 't-str';
+}
+
+function renderValue(val) {
+  if (val === null) return '<span class="t-dim">null</span>';
+  if (typeof val === 'number')  return '<span class="t-num">' + JSON.stringify(val) + '</span>';
+  if (typeof val === 'boolean') return '<span class="t-amber">' + val + '</span>';
+  if (typeof val === 'string') {
+    var cls = colourClass(val);
+    return '<span class="' + (cls || 't-str') + '">' + JSON.stringify(val) + '</span>';
+  }
+  return JSON.stringify(val);
+}
+
+function renderJSON(obj) {
+  if (obj === null || typeof obj !== 'object') return renderValue(obj);
+  var lines = Object.keys(obj).map(function(k) {
+    return '  <span class="t-key">"' + k + '"</span>: ' + renderValue(obj[k]);
+  });
+  return '{' + '\n' + lines.join(',\n') + '\n}';
+}
+
+async function runClaim(claimId, outId) {
+  var el  = document.getElementById(outId);
+  var btn = el.closest('.terminal').querySelector('.run-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  el.innerHTML = '<span class="t-dim"># running via Bedrock — ~15-20s…</span>';
+  try {
+    var r = await fetch(SERVER + '/run?claim=' + claimId,
+                        { signal: AbortSignal.timeout(140000) });
+    var data = await r.json();
+    if (data.error) {
+      el.innerHTML = '<span class="t-red">ERROR: ' + data.error + '</span>';
+    } else if (data.parsed) {
+      el.innerHTML = renderJSON(data.parsed);
+    } else {
+      el.innerHTML = '<span class="t-dim">' + (data.raw || 'no output') + '</span>';
+    }
+  } catch (err) {
+    el.innerHTML = '<span class="t-red">Cannot reach demo server.</span>\n'
+                 + '<span class="t-dim">Open http://localhost:7331 (not the file)</span>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Run';
+  }
+}
+
+async function checkServer() {
+  var el = document.getElementById('demo-status');
+  if (!el) return;
+  try {
+    var r = await fetch(SERVER + '/health', { signal: AbortSignal.timeout(2000) });
+    if (r.ok) {
+      el.innerHTML = '<span style="color:#0a7a50">✓ Demo server ready — click any ▶ Run button.</span>';
+    }
+  } catch (e) {
+    el.innerHTML = 'Server not detected — run the command above, then '
+                 + '<a href="#" onclick="checkServer();return false">retry</a>.';
+  }
+}
+
+window.addEventListener('DOMContentLoaded', checkServer);
+"""
+
+
 CSS = """
 /* ── TOKENS ───────────────────────────────────────────── */
 :root {
@@ -669,76 +745,7 @@ def build(out_path: Path) -> None:
   </p>
 </section>
 
-<script>
-const SERVER = 'http://localhost:7331';
-
-function colour(val) {{
-  if (typeof val === 'string') {{
-    if (['fast_track','auto_resolve'].includes(val)) return 'class="t-green"';
-    if (['deny'].includes(val)) return 'class="t-red"';
-    if (val === 'pending_human_review') return 'class="t-amber"';
-    return 'class="t-str"';
-  }}
-  if (typeof val === 'number') return 'class="t-num"';
-  if (typeof val === 'boolean') return 'class="t-amber"';
-  return '';
-}}
-
-function renderJSON(obj, indent) {{
-  if (obj === null) return '<span class="t-dim">null</span>';
-  if (typeof obj !== 'object') {{
-    const c = colour(obj);
-    const v = JSON.stringify(obj);
-    return c ? `<span ${{c}}>${{v}}</span>` : v;
-  }}
-  const pad = '  '.repeat(indent + 1);
-  const closePad = '  '.repeat(indent);
-  const entries = Object.entries(obj).map(([k, v]) =>
-    `${{pad}}<span class="t-key">"${{k}}"</span>: ${{renderJSON(v, indent + 1)}}`
-  );
-  return `{{\n${{entries.join(',\n')}}\n${{closePad}}}}`;
-}}
-
-async function runClaim(claimId, outId) {{
-  const el = document.getElementById(outId);
-  const btn = el.closest('.terminal').querySelector('.run-btn');
-  btn.disabled = true;
-  btn.textContent = '⏳';
-  el.innerHTML = '<span class="t-dim"># running — this takes ~10-20s via Bedrock…</span>';
-  try {{
-    const r = await fetch(`${{SERVER}}/run?claim=${{claimId}}`, {{ signal: AbortSignal.timeout(140000) }});
-    const data = await r.json();
-    if (data.error) {{
-      el.innerHTML = `<span class="t-red">ERROR: ${{data.error}}</span>`;
-    }} else if (data.parsed) {{
-      el.innerHTML = renderJSON(data.parsed, 0);
-    }} else {{
-      el.innerHTML = `<span class="t-dim">${{data.raw || 'no output'}}</span>`;
-    }}
-    if (data.stderr) {{
-      el.innerHTML += `\n<span class="t-dim">${{data.stderr.slice(-200)}}</span>`;
-    }}
-  }} catch (err) {{
-    el.innerHTML = `<span class="t-red">Could not reach demo server.</span>\n<span class="t-dim">Start it with:\n.venv/bin/python scripts/demo_server.py</span>`;
-  }} finally {{
-    btn.disabled = false;
-    btn.textContent = '▶ Run';
-  }}
-}}
-
-async function checkServer() {{
-  const el = document.getElementById('demo-status');
-  try {{
-    const r = await fetch(`${{SERVER}}/health`, {{ signal: AbortSignal.timeout(2000) }});
-    if (r.ok) {{
-      el.innerHTML = '<span style="color:var(--green)">✓ Demo server ready — click any ▶ Run button.</span>';
-    }}
-  }} catch {{
-    el.innerHTML = 'Server not detected — run the command above, then <a href="#" onclick="checkServer();return false">retry</a>.';
-  }}
-}}
-checkServer();
-</script>
+<script>{DEMO_JS}</script>
 
 <!-- ══════ 06 · RESULTS ═══════════════════════════════════ -->
 <section class="slide" id="results">
