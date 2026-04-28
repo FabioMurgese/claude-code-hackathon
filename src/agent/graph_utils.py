@@ -9,7 +9,7 @@ Owner: Person B
 
 from langchain_aws import ChatBedrockConverse
 
-MODEL = "eu.anthropic.claude-opus-4-7"
+MODEL = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
 class MaxTokensError(Exception):

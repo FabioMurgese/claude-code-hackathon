@@ -95,6 +95,21 @@ _graph = (
 )
 
 
+def _parse_json_response(content) -> dict:
+    """Extract JSON from AI content, stripping markdown fences and handling list content."""
+    if isinstance(content, list):
+        text = " ".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
+    else:
+        text = str(content)
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+    if not text:
+        raise ValueError("PolicyChecker returned empty content — cannot parse PolicyResult")
+    return json.loads(text)
+
+
 def run_policy_checker(claim_summary: dict) -> dict:
     """Run PolicyChecker in isolated context — receives ClaimSummary explicitly."""
     init_messages = [
@@ -108,4 +123,4 @@ def run_policy_checker(claim_summary: dict) -> dict:
     last_ai = next(
         m for m in reversed(final_state["messages"]) if isinstance(m, AIMessage)
     )
-    return json.loads(last_ai.content)
+    return _parse_json_response(last_ai.content)

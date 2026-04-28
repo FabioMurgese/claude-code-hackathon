@@ -110,6 +110,19 @@ def _synthesize(state: CoordinatorState) -> dict:
     return {"messages": [response]}
 
 
+def _strip_json(content) -> str:
+    """Strip markdown code fences and extract text from list content."""
+    if isinstance(content, list):
+        text = " ".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
+    else:
+        text = str(content)
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+    return text
+
+
 def _validate(state: CoordinatorState) -> dict:
     if state.get("final_result"):
         return {}
@@ -119,7 +132,7 @@ def _validate(state: CoordinatorState) -> dict:
     if last_ai is None:
         return {"last_validation_error": "no AI message found", "retry_count": state.get("retry_count", 0) + 1}
     try:
-        decision = json.loads(last_ai.content)
+        decision = json.loads(_strip_json(last_ai.content))
     except json.JSONDecodeError:
         return {"last_validation_error": "output non era JSON valido", "retry_count": state.get("retry_count", 0) + 1}
     is_valid, error = validate_decision(decision)

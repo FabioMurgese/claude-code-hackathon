@@ -61,7 +61,7 @@ def main():
     table.add_row("escalation_rate/needless", str(esc.get("needless", 0)), "—", "—")
 
     console.print(table)
-    console.print(f"[dim]Total: {metrics.get('total', 0)} | Correct: {metrics.get('correct', 0)} | Scorecard → evals/scorecard.json[/dim]")
+    console.print(f"[dim]Total: {metrics.get('total', 0)} | Correct: {metrics.get('correct', 0)} | Scorecard -> evals/scorecard.json[/dim]")
     sys.exit(1 if failed else 0)
 
 
