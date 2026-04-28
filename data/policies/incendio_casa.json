@@ -1,0 +1,10 @@
+{
+  "policy_id": "incendio_casa",
+  "coverage_type": "Incendio e Altri Rischi",
+  "max_coverage_eur": 200000,
+  "exclusions": ["dolo", "guerra", "terremoto"],
+  "valid_from": "2023-06-01",
+  "valid_until": "2025-05-31",
+  "status": "scaduta",
+  "deductible_eur": 1000
+}

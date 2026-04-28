@@ -1,0 +1,10 @@
+{
+  "policy_id": "infortuni",
+  "coverage_type": "Infortuni",
+  "max_coverage_eur": 100000,
+  "exclusions": ["sport_estremi", "lavori_pericolosi"],
+  "valid_from": "2025-01-01",
+  "valid_until": "2027-12-31",
+  "status": "active",
+  "deductible_eur": 0
+}
