@@ -29,7 +29,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 
-from src.agent.graph_utils import build_chat_model, MaxTokensError
+from src.agent.graph_utils import build_chat_model, MaxTokensError, extract_json_str
 from src.validator import validate_decision
 from src.escalation_rules import should_escalate
 from src.specialists.document_reader import run_document_reader
@@ -119,8 +119,8 @@ def _validate(state: CoordinatorState) -> dict:
     if last_ai is None:
         return {"last_validation_error": "no AI message found", "retry_count": state.get("retry_count", 0) + 1}
     try:
-        decision = json.loads(last_ai.content)
-    except json.JSONDecodeError:
+        decision = json.loads(extract_json_str(last_ai.content))
+    except (json.JSONDecodeError, ValueError):
         return {"last_validation_error": "output non era JSON valido", "retry_count": state.get("retry_count", 0) + 1}
     is_valid, error = validate_decision(decision)
     if is_valid:
