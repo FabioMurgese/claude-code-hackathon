@@ -24,7 +24,7 @@ from langchain_core.tools import StructuredTool
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 
-from src.agent.graph_utils import build_chat_model, MaxTokensError
+from src.agent.graph_utils import build_chat_model, MaxTokensError, extract_json_str
 from src.agent.tools_node import SafeToolNode
 from src.tools.lookup_policy import lookup_policy
 from src.tools.check_fraud_flags import check_fraud_flags
@@ -108,4 +108,4 @@ def run_policy_checker(claim_summary: dict) -> dict:
     last_ai = next(
         m for m in reversed(final_state["messages"]) if isinstance(m, AIMessage)
     )
-    return json.loads(last_ai.content)
+    return json.loads(extract_json_str(last_ai.content))
