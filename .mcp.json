@@ -1,0 +1,17 @@
+{
+  "github": {
+    "type": "http",
+    "url": "https://api.githubcopilot.com/mcp/",
+    "headers": {
+      "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+    }
+  },
+  "aws": {
+    "command": "uvx",
+    "args": ["awslabs.core-mcp-server@latest"],
+    "env": {
+      "AWS_REGION": "eu-north-1",
+      "FASTMCP_LOG_LEVEL": "ERROR"
+    }
+  }
+}
