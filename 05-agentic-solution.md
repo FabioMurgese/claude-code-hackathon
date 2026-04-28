@@ -63,4 +63,5 @@ Waypoints, not a checklist. Pick the ones you want to pursue.
 
 - **Agentic Architecture.** Coordinator plus specialist split with explicit context passing; session management; `stop_reason` handling in the loop.
 - **Tool Design.** Custom tools with structured error responses; tool descriptions that teach boundaries and what the tool does *not* do; tool-count discipline per agent.
-- **Context Management.** Escalation rules that use category plus confidence plus impact; adversarial eval including prompt injection; validation-retry with structured errors; stratified sampling and false-confidence rate on the agent eval (via The Scorecard).
+- **Context Management.** Escalation rules that use category plus confidence plus impact; adversarial eval including prompt injection; validation-retry with structured errors; stratified sampling and false-con1
+fidence rate on the agent eval (via The Scorecard).
