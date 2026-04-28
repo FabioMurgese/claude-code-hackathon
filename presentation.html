@@ -437,18 +437,18 @@ footer .footer-brand { font-weight: 700; color: var(--text2); margin-bottom: .4r
       <span class="ch-status done">✓ Complete</span>
     </div>
 
-    <div class="ch-card partial">
+    <div class="ch-card done">
       <div class="ch-num">Challenge 4</div>
       <div class="ch-name">The Triage</div>
-      <div class="ch-body">Coordinator ingests, enriches, routes. Validation-retry loop. Reasoning chain logged per decision.</div>
-      <span class="ch-status partial">⚙ In Progress</span>
+      <div class="ch-body">LangGraph coordinator: read_documents → check_policy → synthesize → validate (retry ≤3) → check_escalation. Full reasoning chain logged per decision.</div>
+      <span class="ch-status done">✓ Complete</span>
     </div>
 
-    <div class="ch-card partial">
+    <div class="ch-card done">
       <div class="ch-num">Challenge 5</div>
       <div class="ch-name">The Brake</div>
-      <div class="ch-body">PreToolUse hook: hard stops for PII, frozen accounts. Escalation rules: amount + confidence + impact.</div>
-      <span class="ch-status partial">⚙ In Progress</span>
+      <div class="ch-body">PreToolUse hook: deterministic hard stops for PII, frozen accounts, fraud-approve. Escalation rules: amount + confidence + impact.</div>
+      <span class="ch-status done">✓ Complete</span>
     </div>
 
     <div class="ch-card done">
@@ -458,11 +458,11 @@ footer .footer-brand { font-weight: 700; color: var(--text2); margin-bottom: .4r
       <span class="ch-status done">✓ Complete</span>
     </div>
 
-    <div class="ch-card partial">
+    <div class="ch-card done">
       <div class="ch-num">Challenge 7</div>
       <div class="ch-name">The Scorecard</div>
-      <div class="ch-body">Eval harness with accuracy, precision/category, escalation rate, adversarial-pass rate, false-confidence rate.</div>
-      <span class="ch-status partial">⚙ In Progress</span>
+      <div class="ch-body">Eval harness runs 60 labeled claims. Accuracy 63.3% · Adversarial pass 75% · False-confidence 18.3%.</div>
+      <span class="ch-status done">✓ Complete</span>
     </div>
 
     <div class="ch-card skip">
@@ -893,7 +893,7 @@ footer .footer-brand { font-weight: 700; color: var(--text2); margin-bottom: .4r
   <div class="footer-brand">The Insur-gents · Accenture × Anthropic · Claude Code Hackathon</div>
   <div>Built with Claude Code · AWS Bedrock Opus 4.7 · Scenario 5 — Agentic Solution</div>
   <div style="margin-top:.4rem">
-    Generated 28 Apr 2026 · 13:08 UTC ·
+    Generated 28 Apr 2026 · 13:11 UTC ·
     <code>python scripts/build_presentation.py</code>
   </div>
 </footer>

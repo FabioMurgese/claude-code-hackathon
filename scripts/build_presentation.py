@@ -574,18 +574,18 @@ def build(out_path: Path) -> None:
       <span class="ch-status done">✓ Complete</span>
     </div>
 
-    <div class="ch-card partial">
+    <div class="ch-card done">
       <div class="ch-num">Challenge 4</div>
       <div class="ch-name">The Triage</div>
-      <div class="ch-body">Coordinator ingests, enriches, routes. Validation-retry loop. Reasoning chain logged per decision.</div>
-      <span class="ch-status partial">⚙ In Progress</span>
+      <div class="ch-body">LangGraph coordinator: read_documents → check_policy → synthesize → validate (retry ≤3) → check_escalation. Full reasoning chain logged per decision.</div>
+      <span class="ch-status done">✓ Complete</span>
     </div>
 
-    <div class="ch-card partial">
+    <div class="ch-card done">
       <div class="ch-num">Challenge 5</div>
       <div class="ch-name">The Brake</div>
-      <div class="ch-body">PreToolUse hook: hard stops for PII, frozen accounts. Escalation rules: amount + confidence + impact.</div>
-      <span class="ch-status partial">⚙ In Progress</span>
+      <div class="ch-body">PreToolUse hook: deterministic hard stops for PII, frozen accounts, fraud-approve. Escalation rules: amount + confidence + impact.</div>
+      <span class="ch-status done">✓ Complete</span>
     </div>
 
     <div class="ch-card done">
@@ -595,11 +595,11 @@ def build(out_path: Path) -> None:
       <span class="ch-status done">✓ Complete</span>
     </div>
 
-    <div class="ch-card partial">
+    <div class="ch-card done">
       <div class="ch-num">Challenge 7</div>
       <div class="ch-name">The Scorecard</div>
-      <div class="ch-body">Eval harness with accuracy, precision/category, escalation rate, adversarial-pass rate, false-confidence rate.</div>
-      <span class="ch-status partial">⚙ In Progress</span>
+      <div class="ch-body">Eval harness runs 60 labeled claims. Accuracy 63.3% · Adversarial pass 75% · False-confidence 18.3%.</div>
+      <span class="ch-status done">✓ Complete</span>
     </div>
 
     <div class="ch-card skip">
@@ -1006,7 +1006,7 @@ def build(out_path: Path) -> None:
     out_path.write_text(html, encoding="utf-8")
     size = out_path.stat().st_size // 1024
     print(f"✓ {out_path} — {size} KB")
-    print(f"  challenges: 8 mapped (6 done/partial, 1 stretch)")
+    print(f"  challenges: 8 mapped (7 done, 1 stretch)")
     print(f"  key decisions: {len(kd)}")
     print(f"  scorecard: {'loaded ✓' if scorecard else 'placeholder — run evals/run_evals.py'}")
     print(f"  decision examples: {len(decisions)}")
