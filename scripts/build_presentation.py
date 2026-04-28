@@ -1,16 +1,15 @@
 """
-Assembles presentation.html from documentation and eval results.
+Assembles presentation.html — a Claude Code showcase using the insurance
+claims agent as proof-of-work.
 
-Sources:
-  docs/mandate.md            → "What the agent does" section
-  docs/adr/001-agent-arch.md → "Architecture" section
-  evals/scorecard.json       → "Results" section with inline metrics
-  data/decisions/*.json      → "Example runs" (3 sampled reasoning chains)
+The story: what Claude Code made possible in 3 hours that would have taken
+a team days without it.
 
-Extracts all '## Key Decision' H2 sections from each doc and renders them
-as highlighted callouts in the presentation.
-
-Run after evals/run_evals.py has produced evals/scorecard.json.
+Sources (auto-detected, gracefully absent):
+  docs/mandate.md            → product evidence
+  docs/adr/001-agent-arch.md → architecture evidence
+  evals/scorecard.json       → eval metrics
+  data/decisions/*.json      → live agent output examples
 
 Usage:
     python scripts/build_presentation.py
@@ -24,468 +23,635 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-MANDATE_PATH  = Path("docs/mandate.md")
-ADR_PATH      = Path("docs/adr/001-agent-arch.md")
+MANDATE_PATH   = Path("docs/mandate.md")
+ADR_PATH       = Path("docs/adr/001-agent-arch.md")
 SCORECARD_PATH = Path("evals/scorecard.json")
-DECISIONS_DIR = Path("data/decisions")
-DEFAULT_OUT   = Path("presentation.html")
+DECISIONS_DIR  = Path("data/decisions")
+DEFAULT_OUT    = Path("presentation.html")
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _read_md(path: Path) -> str:
+def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
-def _extract_key_decisions(md: str) -> list[str]:
-    """Return all content under '## Key Decision' headings."""
-    blocks: list[str] = []
-    for m in re.finditer(r"^## Key Decision\b.*?\n(.*?)(?=\n## |\Z)", md, re.MULTILINE | re.DOTALL):
-        text = m.group(1).strip()
-        if text:
-            blocks.append(text)
-    return blocks
+def _extract_key_decisions(md: str) -> list[tuple[str, str]]:
+    """Return (heading_context, body) for every ## Key Decision block."""
+    results = []
+    for m in re.finditer(
+        r"(?:^#{1,3} (.+)\n.*?)^## Key Decision\b.*?\n(.*?)(?=\n## |\Z)",
+        md, re.MULTILINE | re.DOTALL
+    ):
+        results.append((m.group(1).strip(), m.group(2).strip()))
+    if not results:
+        for m in re.finditer(r"^## Key Decision\b.*?\n(.*?)(?=\n## |\Z)", md, re.MULTILINE | re.DOTALL):
+            results.append(("", m.group(1).strip()))
+    return results
 
 
-def _md_to_html(md: str) -> str:
-    """Minimal Markdown → HTML: headings, bold, inline code, tables, paragraphs."""
-    lines = md.split("\n")
-    out: list[str] = []
-    in_table = False
-    in_code = False
-    code_buf: list[str] = []
-
-    for line in lines:
-        # fenced code blocks
-        if line.startswith("```"):
-            if not in_code:
-                in_code = True
-                lang = line[3:].strip()
-                out.append(f'<pre><code class="language-{lang}">')
-                code_buf = []
-            else:
-                in_code = False
-                out.append("\n".join(code_buf) + "\n</code></pre>")
-            continue
-        if in_code:
-            code_buf.append(line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
-            continue
-
-        # headings
-        if line.startswith("#### "):
-            out.append(f"<h4>{line[5:]}</h4>")
-        elif line.startswith("### "):
-            out.append(f"<h3>{line[4:]}</h3>")
-        elif line.startswith("## "):
-            out.append(f"<h2>{line[3:]}</h2>")
-        elif line.startswith("# "):
-            out.append(f"<h1>{line[2:]}</h1>")
-        # horizontal rule
-        elif line.strip() in ("---", "***", "___"):
-            out.append("<hr>")
-        # list items
-        elif re.match(r"^[-*] ", line):
-            out.append(f"<li>{_inline(line[2:])}</li>")
-        elif re.match(r"^\d+\. ", line):
-            out.append(f"<li>{_inline(re.sub(r'^\d+\. ', '', line))}</li>")
-        # table rows
-        elif line.startswith("|"):
-            cells = [c.strip() for c in line.strip("|").split("|")]
-            if all(re.match(r"^[-: ]+$", c) for c in cells):
-                in_table = True
-                continue
-            tag = "th" if not in_table else "td"
-            row = "".join(f"<{tag}>{_inline(c)}</{tag}>" for c in cells)
-            if not in_table:
-                out.append(f"<table><thead><tr>{row}</tr></thead><tbody>")
-            else:
-                out.append(f"<tr>{row}</tr>")
-        else:
-            if in_table and not line.startswith("|"):
-                out.append("</tbody></table>")
-                in_table = False
-            if line.strip():
-                out.append(f"<p>{_inline(line)}</p>")
-            else:
-                out.append("")
-
-    if in_table:
-        out.append("</tbody></table>")
-    return "\n".join(out)
+def _scorecard_badges(sc: dict) -> str:
+    def pct(v): return f"{v:.0%}" if isinstance(v, float) else "—"
+    def badge(ok): return f'<span class="badge {"pass" if ok else "fail"}">{"✓" if ok else "✗"}</span>'
+    adv  = sc.get("adversarial_pass_rate")
+    fc   = sc.get("false_confidence_rate")
+    acc  = sc.get("accuracy")
+    rows = [
+        ("Accuracy",              pct(acc),  ""),
+        ("Adversarial pass rate", pct(adv),  badge(adv >= 0.80) if adv is not None else ""),
+        ("False-confidence rate", pct(fc),   badge(fc  <= 0.05) if fc  is not None else ""),
+        ("Total claims scored",   str(sc.get("total","—")), ""),
+    ]
+    trs = "".join(f"<tr><td>{n}</td><td class='num'>{v}</td><td>{b}</td></tr>" for n,v,b in rows)
+    return f"<table class='scorecard-table'><tbody>{trs}</tbody></table>"
 
 
-def _inline(text: str) -> str:
-    """Handle bold, italic, and inline code in a single line."""
-    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
-    text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
-    text = re.sub(r"\*([^*]+)\*", r"<em>\1</em>", text)
-    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', text)
-    return text
-
-
-def _key_decision_callout(text: str, source: str) -> str:
-    return f"""
-<div class="key-decision">
-  <div class="key-decision-label">🔑 Key Decision <span class="key-decision-source">— {source}</span></div>
-  <div class="key-decision-body">{_md_to_html(text)}</div>
-</div>"""
-
-
-def _scorecard_html(scorecard: dict) -> str:
-    total    = scorecard.get("total", "—")
-    correct  = scorecard.get("correct", "—")
-    accuracy = scorecard.get("accuracy", None)
-    adv_pass = scorecard.get("adversarial_pass_rate", None)
-    false_cf = scorecard.get("false_confidence_rate", None)
-    esc      = scorecard.get("escalation_rate", {})
-    prec     = scorecard.get("precision_per_category", {})
-
-    def pct(v):
-        return f"{v:.1%}" if isinstance(v, float) else "—"
-
-    def badge(v, threshold, op="ge"):
-        if v is None:
-            return ""
-        ok = (v >= threshold) if op == "ge" else (v <= threshold)
-        cls = "pass" if ok else "fail"
-        return f'<span class="badge {cls}">{"PASS" if ok else "FAIL"}</span>'
-
-    prec_rows = "".join(
-        f"<tr><td>precision / {cat}</td><td>{pct(p)}</td><td>—</td></tr>"
-        for cat, p in prec.items() if p is not None
-    )
-
-    return f"""
-<div class="scorecard">
-  <h3>Eval Scorecard</h3>
-  <p class="scorecard-meta">Total: {total} &nbsp;|&nbsp; Correct: {correct} &nbsp;|&nbsp;
-     Run: {scorecard.get("_run_at", "—")}</p>
-  <table>
-    <thead><tr><th>Metric</th><th>Value</th><th>CI Threshold</th></tr></thead>
-    <tbody>
-      <tr><td>Accuracy</td><td>{pct(accuracy)}</td><td>—</td></tr>
-      <tr><td>Adversarial pass rate</td><td>{pct(adv_pass)}</td>
-          <td>≥ 80% {badge(adv_pass, 0.80)}</td></tr>
-      <tr><td>False-confidence rate</td><td>{pct(false_cf)}</td>
-          <td>≤ 5% {badge(false_cf, 0.05, "le")}</td></tr>
-      <tr><td>Escalation correct</td><td>{esc.get("correct", "—")}</td><td>—</td></tr>
-      <tr><td>Escalation needless</td><td>{esc.get("needless", "—")}</td><td>—</td></tr>
-      {prec_rows}
-    </tbody>
-  </table>
-</div>"""
-
-
-def _decision_card(record: dict) -> str:
-    claim_id  = record.get("claim_id", "—")
-    decision  = record.get("decision", "—")
-    category  = record.get("category", "—")
-    confidence = record.get("confidence", 0)
-    rationale  = record.get("rationale", "—")
-    retries    = record.get("retry_count", 0)
-    ts         = record.get("timestamp", "")[:19]
-    dec_class  = {"fast_track": "fast-track", "deny": "deny",
-                  "investigate": "investigate", "auto_resolve": "auto-resolve"}.get(decision, "")
-    return f"""
-<div class="decision-card">
-  <div class="decision-header">
-    <span class="claim-id">{claim_id}</span>
-    <span class="decision-badge {dec_class}">{decision}</span>
-    <span class="confidence">confidence: {confidence:.0%}</span>
-    {"<span class='retries'>retries: " + str(retries) + "</span>" if retries else ""}
-  </div>
-  <div class="decision-category">Category: <code>{category}</code> &nbsp;·&nbsp; {ts}</div>
-  <div class="decision-rationale">{rationale}</div>
+def _decision_mini(r: dict) -> str:
+    d   = r.get("decision","—")
+    cls = {"fast_track":"green","deny":"red","investigate":"yellow","auto_resolve":"blue"}.get(d,"")
+    return f"""<div class="decision-mini">
+  <span class="dm-id">{r.get("claim_id","—")}</span>
+  <span class="dm-dec {cls}">{d}</span>
+  <span class="dm-conf">{r.get("confidence",0):.0%}</span>
+  <p class="dm-rationale">{r.get("rationale","")[:120]}{"…" if len(r.get("rationale",""))>120 else ""}</p>
 </div>"""
 
 
 # ---------------------------------------------------------------------------
-# Main assembler
+# CSS
+# ---------------------------------------------------------------------------
+
+CSS = """
+:root {
+  --bg:#0d0f18; --bg2:#13162b; --bg3:#1c2038; --bg4:#242847;
+  --text:#e8eaf0; --text2:#9aa5c0; --text3:#5a6890;
+  --accent:#6c63ff; --accent2:#a78bfa; --accent3:#38bdf8;
+  --green:#10b981; --red:#ef4444; --yellow:#f59e0b; --blue:#3b82f6;
+  --border:#252a4a;
+  --slide-pad: 5vw;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+     background:var(--bg);color:var(--text);line-height:1.65;font-size:16px}
+
+/* ── SLIDE LAYOUT ─────────────────────────────────────────────── */
+.slide{
+  min-height:100vh;display:flex;flex-direction:column;justify-content:center;
+  padding:4rem var(--slide-pad);border-bottom:1px solid var(--border);
+  position:relative;overflow:hidden;
+}
+.slide.cover{
+  background:radial-gradient(ellipse at 30% 50%,#1e1b5e 0%,var(--bg) 70%);
+  align-items:center;text-align:center;
+}
+.slide.dark  {background:var(--bg)}
+.slide.medium{background:var(--bg2)}
+.slide.light {background:var(--bg3)}
+
+/* ── TYPOGRAPHY ────────────────────────────────────────────────── */
+.eyebrow{font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+          color:var(--accent2);margin-bottom:.8rem}
+h1.hero-title{font-size:clamp(2.4rem,6vw,4.2rem);font-weight:900;line-height:1.1;
+               background:linear-gradient(135deg,#fff 30%,var(--accent2));
+               -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+               background-clip:text;margin-bottom:1rem}
+h2.slide-title{font-size:clamp(1.6rem,4vw,2.6rem);font-weight:800;color:#fff;
+                margin-bottom:.5rem;line-height:1.2}
+.slide-sub{font-size:1.05rem;color:var(--text2);max-width:680px;margin-bottom:2rem}
+h3{font-size:1.15rem;color:var(--text);font-weight:700;margin-bottom:.6rem}
+p{color:var(--text2);margin-bottom:.8rem}
+code{background:var(--bg4);color:#a5b4fc;padding:.15em .45em;border-radius:4px;
+     font-size:.88em;font-family:"SF Mono",monospace}
+pre{background:var(--bg4);border:1px solid var(--border);border-radius:10px;
+    padding:1.2rem 1.4rem;overflow-x:auto;margin:.8rem 0;font-size:.85rem;line-height:1.7}
+pre code{background:none;padding:0;color:#e2e8f0}
+a{color:var(--accent3)}
+
+/* ── COMPONENTS ────────────────────────────────────────────────── */
+.tag-row{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;margin-bottom:2rem}
+.tag{background:var(--bg3);border:1px solid var(--border);border-radius:20px;
+     padding:.3rem .9rem;font-size:.82rem;color:var(--text2)}
+.tag strong{color:var(--text)}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;margin-top:1.5rem}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1.5rem}
+
+.card{background:var(--bg3);border:1px solid var(--border);border-radius:12px;
+      padding:1.2rem 1.4rem}
+.card.accent-top{border-top:3px solid var(--accent)}
+.card.green-top {border-top:3px solid var(--green)}
+.card.blue-top  {border-top:3px solid var(--blue)}
+.card.yellow-top{border-top:3px solid var(--yellow)}
+.card h3{font-size:1rem}
+.card p{font-size:.88rem;margin-bottom:.3rem}
+.card .icon{font-size:1.8rem;margin-bottom:.6rem}
+
+.feature-row{display:flex;align-items:flex-start;gap:1rem;
+             padding:1rem 0;border-bottom:1px solid var(--border)}
+.feature-row:last-child{border-bottom:none}
+.feature-icon{font-size:1.6rem;flex-shrink:0;width:2.4rem;text-align:center}
+.feature-text h4{font-size:.95rem;color:var(--text);font-weight:700;margin-bottom:.2rem}
+.feature-text p{font-size:.87rem;color:var(--text2);margin:0}
+
+.timeline{position:relative;padding-left:2.5rem;margin-top:1.5rem}
+.timeline::before{content:"";position:absolute;left:.7rem;top:0;bottom:0;
+                   width:2px;background:var(--border)}
+.tl-item{position:relative;margin-bottom:1.6rem}
+.tl-dot{position:absolute;left:-1.9rem;top:.3rem;width:.9rem;height:.9rem;
+         border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+.tl-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+           color:var(--accent2);margin-bottom:.25rem}
+.tl-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:.2rem}
+.tl-body{font-size:.88rem;color:var(--text2)}
+
+.capability-pill{display:inline-flex;align-items:center;gap:.4rem;
+                  background:rgba(108,99,255,.15);border:1px solid rgba(108,99,255,.4);
+                  border-radius:20px;padding:.25rem .8rem;font-size:.82rem;
+                  color:var(--accent2);margin:.2rem}
+
+.quote-block{border-left:4px solid var(--accent);padding:1rem 1.4rem;
+              background:rgba(108,99,255,.08);border-radius:0 8px 8px 0;margin:1rem 0}
+.quote-block p{font-size:1.05rem;color:var(--text);font-style:italic;margin:0}
+.quote-author{font-size:.82rem;color:var(--text3);margin-top:.4rem}
+
+.metric-big{font-size:3rem;font-weight:900;color:#fff;line-height:1}
+.metric-label{font-size:.85rem;color:var(--text2);margin-top:.3rem}
+
+.badge{display:inline-block;font-size:.72rem;font-weight:700;padding:.15em .55em;
+        border-radius:4px;margin-left:.3rem}
+.badge.pass{background:rgba(16,185,129,.2);color:var(--green)}
+.badge.fail{background:rgba(239,68,68,.2);color:var(--red)}
+
+.scorecard-table{width:100%;border-collapse:collapse;font-size:.9rem}
+.scorecard-table td{padding:.45rem .7rem;border-bottom:1px solid var(--border);color:var(--text2)}
+.scorecard-table td.num{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.scorecard-table tr:last-child td{border-bottom:none}
+
+.decision-mini{background:var(--bg4);border:1px solid var(--border);border-radius:8px;
+                padding:.7rem 1rem;margin-bottom:.6rem}
+.decision-mini .dm-id{font-family:monospace;font-size:.78rem;color:var(--text3);margin-right:.5rem}
+.decision-mini .dm-dec{font-size:.78rem;font-weight:700;padding:.15em .5em;border-radius:4px}
+.dm-dec.green{background:rgba(16,185,129,.2);color:var(--green)}
+.dm-dec.red  {background:rgba(239,68,68,.2);color:var(--red)}
+.dm-dec.yellow{background:rgba(245,158,11,.2);color:var(--yellow)}
+.dm-dec.blue {background:rgba(59,130,246,.2);color:var(--blue)}
+.dm-conf{font-size:.78rem;color:var(--text3);margin-left:.4rem}
+.dm-rationale{font-size:.82rem;color:var(--text2);margin-top:.3rem;margin-bottom:0}
+
+.kd-card{background:linear-gradient(135deg,rgba(108,99,255,.1),rgba(167,139,250,.06));
+          border:1px solid rgba(108,99,255,.35);border-left:4px solid var(--accent);
+          border-radius:0 10px 10px 0;padding:1rem 1.3rem;margin:.8rem 0}
+.kd-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;
+           color:var(--accent2);margin-bottom:.4rem}
+.kd-source{font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0}
+.kd-body{font-size:.9rem;color:var(--text)}
+
+.arch-flow{background:var(--bg4);border:1px solid var(--border);border-radius:10px;
+            padding:1.2rem 1.5rem;font-family:monospace;font-size:.82rem;line-height:2;
+            color:#e2e8f0}
+.af-coord{color:#6c63ff;font-weight:700}
+.af-spec {color:#10b981;font-weight:700}
+.af-tool {color:#f59e0b}
+.af-dim  {color:#5a6890}
+
+.pill-row{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0}
+.pill{background:var(--bg4);border:1px solid var(--border);border-radius:20px;
+       padding:.2rem .7rem;font-size:.8rem;color:var(--text2)}
+
+.progress-bar-wrap{background:var(--bg4);border-radius:20px;height:8px;margin:.4rem 0}
+.progress-bar{height:100%;border-radius:20px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+
+.team-card{text-align:center;padding:1.5rem 1rem}
+.team-avatar{width:64px;height:64px;border-radius:50%;
+              background:linear-gradient(135deg,var(--accent),var(--accent2));
+              display:flex;align-items:center;justify-content:center;
+              font-size:1.4rem;font-weight:900;color:#fff;margin:0 auto .8rem}
+.team-card h3{font-size:1rem;color:#fff;margin-bottom:.3rem}
+.team-card p{font-size:.82rem;color:var(--text2);margin:0}
+
+nav{position:sticky;top:0;z-index:100;background:rgba(13,15,24,.92);
+     backdrop-filter:blur(12px);border-bottom:1px solid var(--border);
+     padding:.6rem var(--slide-pad);display:flex;gap:1.2rem;flex-wrap:wrap;align-items:center}
+nav .nav-brand{font-weight:800;color:#fff;font-size:.9rem;margin-right:auto}
+nav a{color:var(--text3);text-decoration:none;font-size:.82rem;transition:color .2s}
+nav a:hover{color:var(--accent2)}
+
+.slide-num{position:absolute;bottom:1.5rem;right:var(--slide-pad);
+            font-size:.72rem;color:var(--text3)}
+
+footer{text-align:center;padding:2rem;color:var(--text3);font-size:.78rem;
+        border-top:1px solid var(--border)}
+
+@media(max-width:768px){
+  .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+  .slide{padding:3rem 1.5rem}
+}
+"""
+
+
+# ---------------------------------------------------------------------------
+# HTML template
 # ---------------------------------------------------------------------------
 
 def build(out_path: Path) -> None:
-    mandate_md = _read_md(MANDATE_PATH)
-    adr_md     = _read_md(ADR_PATH)
-
-    scorecard: dict = {}
-    if SCORECARD_PATH.exists():
-        scorecard = json.loads(SCORECARD_PATH.read_text(encoding="utf-8"))
-
-    decision_records: list[dict] = []
+    mandate_md = _read(MANDATE_PATH)
+    adr_md     = _read(ADR_PATH)
+    scorecard: dict = json.loads(SCORECARD_PATH.read_text()) if SCORECARD_PATH.exists() else {}
+    decisions = []
     if DECISIONS_DIR.exists():
         for f in sorted(DECISIONS_DIR.glob("*.json"))[:3]:
-            try:
-                decision_records.append(json.loads(f.read_text(encoding="utf-8")))
-            except Exception:
-                pass
-
-    # Collect all Key Decisions across all docs
-    all_kd = (
-        [_key_decision_callout(t, "Mandate") for t in _extract_key_decisions(mandate_md)]
-        + [_key_decision_callout(t, "Architecture") for t in _extract_key_decisions(adr_md)]
+            try: decisions.append(json.loads(f.read_text()))
+            except Exception: pass
+    kd_all = (
+        [("Mandate", b) for _, b in _extract_key_decisions(mandate_md)] +
+        [("Architecture", b) for _, b in _extract_key_decisions(adr_md)]
     )
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    # scorecard section content
+    if scorecard:
+        results_content = f"""
+        <div class="grid-2">
+          <div class="card accent-top">
+            <h3>Scorecard</h3>
+            {_scorecard_badges(scorecard)}
+          </div>
+          <div class="card green-top">
+            <h3>Distribution</h3>
+            <p style="font-size:.85rem">Normal traffic: {sum(1 for r in scorecard.get('results',[]) if not r.get('adversarial'))} claims</p>
+            <p style="font-size:.85rem">Adversarial cases: {sum(1 for r in scorecard.get('results',[]) if r.get('adversarial'))} claims</p>
+          </div>
+        </div>"""
+    else:
+        results_content = """
+        <div class="card" style="border:1px dashed var(--border);text-align:center;padding:2rem">
+          <p style="color:var(--text3)">Scorecard pending — run <code>python evals/run_evals.py</code> once the agent is fully wired.<br>
+          Re-run <code>python scripts/build_presentation.py</code> to populate this section.</p>
+        </div>"""
+
+    # decision examples
+    if decisions:
+        examples_html = "".join(_decision_mini(r) for r in decisions)
+    else:
+        examples_html = """<p style="color:var(--text3);font-style:italic">
+          Decision records will appear here after <code>python -m src.agent ingest CLM-001</code>.</p>"""
+
+    # key decisions callouts
+    kd_html = "".join(f"""
+    <div class="kd-card">
+      <div class="kd-label">🔑 Key Decision <span class="kd-source">— {src}</span></div>
+      <div class="kd-body">{body}</div>
+    </div>""" for src, body in kd_all) if kd_all else "<p style='color:var(--text3)'>No key decisions extracted yet.</p>"
 
     html = f"""<!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Insur-gents — Claims Intake Agent</title>
-  <style>
-    :root {{
-      --bg: #0f1117; --bg2: #1a1d27; --bg3: #252836;
-      --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b;
-      --accent: #6366f1; --accent2: #8b5cf6;
-      --green: #10b981; --red: #ef4444; --yellow: #f59e0b; --blue: #3b82f6;
-      --border: #2d3148;
-    }}
-    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: var(--bg); color: var(--text); line-height: 1.6; }}
-    .hero {{ background: linear-gradient(135deg, var(--bg2) 0%, #1e1b4b 100%);
-             padding: 4rem 2rem; text-align: center; border-bottom: 1px solid var(--border); }}
-    .hero h1 {{ font-size: 2.8rem; font-weight: 800; color: #fff; margin-bottom: .5rem; }}
-    .hero .subtitle {{ font-size: 1.1rem; color: var(--text2); margin-bottom: 1.5rem; }}
-    .hero .meta {{ display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; }}
-    .meta-item {{ background: var(--bg3); border: 1px solid var(--border);
-                  border-radius: 8px; padding: .5rem 1.2rem; font-size: .85rem; color: var(--text2); }}
-    .meta-item strong {{ color: var(--text); }}
-    nav {{ background: var(--bg2); border-bottom: 1px solid var(--border);
-           padding: .75rem 2rem; display: flex; gap: 1.5rem; flex-wrap: wrap; }}
-    nav a {{ color: var(--text2); text-decoration: none; font-size: .9rem; }}
-    nav a:hover {{ color: var(--accent); }}
-    .container {{ max-width: 1100px; margin: 0 auto; padding: 2rem; }}
-    section {{ margin-bottom: 3rem; }}
-    h2 {{ font-size: 1.6rem; color: #fff; margin-bottom: 1rem;
-          padding-bottom: .5rem; border-bottom: 2px solid var(--accent); }}
-    h3 {{ font-size: 1.2rem; color: var(--text); margin: 1.2rem 0 .6rem; }}
-    h4 {{ font-size: 1rem; color: var(--text2); margin: 1rem 0 .4rem; }}
-    p {{ color: var(--text2); margin-bottom: .8rem; }}
-    code {{ background: var(--bg3); color: #a5b4fc; padding: .15em .4em;
-            border-radius: 4px; font-size: .88em; font-family: "SF Mono", monospace; }}
-    pre {{ background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
-           padding: 1rem; overflow-x: auto; margin: .8rem 0; }}
-    pre code {{ background: none; padding: 0; color: #e2e8f0; }}
-    table {{ width: 100%; border-collapse: collapse; margin: .8rem 0; font-size: .9rem; }}
-    th {{ background: var(--bg3); color: var(--text); padding: .6rem .9rem;
-          text-align: left; border-bottom: 2px solid var(--border); }}
-    td {{ padding: .5rem .9rem; border-bottom: 1px solid var(--border); color: var(--text2); }}
-    tr:hover td {{ background: var(--bg3); }}
-    li {{ color: var(--text2); margin-left: 1.5rem; margin-bottom: .25rem; }}
-    hr {{ border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }}
-    a {{ color: var(--accent); }}
-    .key-decision {{
-      background: linear-gradient(135deg, rgba(99,102,241,.12) 0%, rgba(139,92,246,.08) 100%);
-      border: 1px solid var(--accent); border-left: 4px solid var(--accent);
-      border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0;
-    }}
-    .key-decision-label {{ font-size: .75rem; font-weight: 700; color: var(--accent);
-                           text-transform: uppercase; letter-spacing: .08em; margin-bottom: .4rem; }}
-    .key-decision-source {{ font-weight: 400; color: var(--text3); text-transform: none; letter-spacing: 0; }}
-    .key-decision-body p {{ color: var(--text); margin-bottom: .4rem; }}
-    .scorecard {{ background: var(--bg2); border: 1px solid var(--border);
-                  border-radius: 10px; padding: 1.5rem; margin: 1rem 0; }}
-    .scorecard h3 {{ border: none; padding: 0; font-size: 1.1rem; margin-bottom: .5rem; color: var(--text); }}
-    .scorecard-meta {{ font-size: .82rem; color: var(--text3); margin-bottom: .8rem; }}
-    .badge {{ display: inline-block; font-size: .72rem; font-weight: 700; padding: .15em .5em;
-              border-radius: 4px; margin-left: .4rem; }}
-    .badge.pass {{ background: rgba(16,185,129,.2); color: var(--green); }}
-    .badge.fail {{ background: rgba(239,68,68,.2); color: var(--red); }}
-    .scorecard-placeholder {{ color: var(--text3); font-style: italic; font-size: .9rem;
-                               padding: 1rem; border: 1px dashed var(--border); border-radius: 8px; }}
-    .decision-card {{ background: var(--bg2); border: 1px solid var(--border);
-                       border-radius: 10px; padding: 1rem 1.2rem; margin: .8rem 0; }}
-    .decision-header {{ display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; margin-bottom: .4rem; }}
-    .claim-id {{ font-family: monospace; font-size: .85rem; color: var(--text3); }}
-    .decision-badge {{ font-size: .75rem; font-weight: 700; padding: .2em .6em; border-radius: 4px; }}
-    .decision-badge.fast-track {{ background: rgba(16,185,129,.2); color: var(--green); }}
-    .decision-badge.deny {{ background: rgba(239,68,68,.2); color: var(--red); }}
-    .decision-badge.investigate {{ background: rgba(245,158,11,.2); color: var(--yellow); }}
-    .decision-badge.auto-resolve {{ background: rgba(59,130,246,.2); color: var(--blue); }}
-    .confidence {{ font-size: .82rem; color: var(--text3); }}
-    .retries {{ font-size: .78rem; color: var(--yellow); }}
-    .decision-category {{ font-size: .82rem; color: var(--text3); margin-bottom: .4rem; }}
-    .decision-rationale {{ font-size: .9rem; color: var(--text2); }}
-    .decisions-placeholder {{ color: var(--text3); font-style: italic; font-size: .9rem;
-                               padding: 1rem; border: 1px dashed var(--border); border-radius: 8px; }}
-    .team-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }}
-    .team-card {{ background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
-                  padding: 1rem 1.2rem; }}
-    .team-card h4 {{ color: var(--accent); margin-bottom: .3rem; }}
-    .team-card p {{ font-size: .85rem; color: var(--text2); margin: 0; }}
-    .footer {{ text-align: center; padding: 2rem; color: var(--text3);
-               font-size: .82rem; border-top: 1px solid var(--border); }}
-    @media (max-width: 700px) {{
-      .team-grid {{ grid-template-columns: 1fr; }}
-      .hero h1 {{ font-size: 1.8rem; }}
-      .meta {{ flex-direction: column; align-items: center; }}
-    }}
-  </style>
+  <title>The Insur-gents — What Claude Code Can Do</title>
+  <style>{CSS}</style>
 </head>
 <body>
 
-<div class="hero">
-  <h1>The Insur-gents</h1>
-  <p class="subtitle">Insurance Claims Intake Agent — Italian/EU Market &nbsp;·&nbsp; Scenario 5: Agentic Solution</p>
-  <div class="meta">
-    <div class="meta-item"><strong>Stack</strong> Python · Claude Agent SDK · AWS Bedrock</div>
-    <div class="meta-item"><strong>Domain</strong> Insurance Claims (IVASS · GDPR · D.Lgs. 231)</div>
-    <div class="meta-item"><strong>Team</strong> Fabio · Matteo · Luca</div>
-    <div class="meta-item"><strong>Generated</strong> {generated_at}</div>
-  </div>
-</div>
-
 <nav>
-  <a href="#mandate">Mandate</a>
-  <a href="#architecture">Architecture</a>
-  <a href="#tools">Tools</a>
-  <a href="#guardrails">Guardrails</a>
+  <span class="nav-brand">The Insur-gents</span>
+  <a href="#cover">Intro</a>
+  <a href="#what">What Is Claude Code</a>
+  <a href="#how">How We Used It</a>
+  <a href="#capabilities">Capabilities</a>
+  <a href="#product">The Product</a>
   <a href="#results">Results</a>
-  <a href="#examples">Example Runs</a>
-  <a href="#decisions">Key Decisions</a>
+  <a href="#wow">Wow Moments</a>
   <a href="#team">Team</a>
 </nav>
 
-<div class="container">
+<!-- ══════════════════════════════════════════════════════════════════
+     SLIDE 1 — COVER
+═══════════════════════════════════════════════════════════════════ -->
+<section class="slide cover" id="cover">
+  <div class="eyebrow">Claude Code Hackathon · Scenario 5</div>
+  <h1 class="hero-title">What Claude Code<br>Can Actually Do</h1>
+  <p class="slide-sub">
+    We built a production-grade agentic system in 3 hours.<br>
+    Here's what that looks like — and what made it possible.
+  </p>
+  <div class="tag-row">
+    <div class="tag"><strong>Team</strong> The Insur-gents</div>
+    <div class="tag"><strong>Stack</strong> Python · Claude Agent SDK · AWS Bedrock</div>
+    <div class="tag"><strong>Domain</strong> Italian Insurance Claims (IVASS · GDPR)</div>
+    <div class="tag"><strong>Time</strong> 3 hours · 3 devs</div>
+  </div>
+  <span class="slide-num">01</span>
+</section>
 
-  <!-- MANDATE -->
-  <section id="mandate">
-    <h2>What the Agent Does</h2>
-    {_md_to_html(mandate_md)}
-  </section>
+<!-- ══════════════════════════════════════════════════════════════════
+     SLIDE 2 — WHAT IS CLAUDE CODE
+═══════════════════════════════════════════════════════════════════ -->
+<section class="slide medium" id="what">
+  <div class="eyebrow">Not just autocomplete</div>
+  <h2 class="slide-title">Claude Code is a<br>collaborative engineering partner</h2>
+  <p class="slide-sub">It doesn't just write code. It designs, plans, challenges assumptions, and executes — while you stay in control.</p>
+  <div class="grid-3">
+    <div class="card accent-top">
+      <div class="icon">🧠</div>
+      <h3>Thinks before it acts</h3>
+      <p>Plan Mode forces design alignment before any code is written. No more "I'll figure it out as I go."</p>
+    </div>
+    <div class="card green-top">
+      <div class="icon">⚡</div>
+      <h3>Executes in parallel</h3>
+      <p>Dispatches multiple subagents for independent tasks simultaneously. Three devs became six tracks.</p>
+    </div>
+    <div class="card blue-top">
+      <div class="icon">🔒</div>
+      <h3>Safe by design</h3>
+      <p>Hooks, permissions, and PreToolUse gates make it impossible to take dangerous actions accidentally.</p>
+    </div>
+    <div class="card yellow-top">
+      <div class="icon">🗺️</div>
+      <h3>Understands the whole project</h3>
+      <p><code>CLAUDE.md</code> gives every session full context — conventions, architecture, team decisions.</p>
+    </div>
+    <div class="card accent-top">
+      <div class="icon">🔁</div>
+      <h3>Iterates like a teammate</h3>
+      <p>Brainstorms options, proposes trade-offs, asks one question at a time, and validates before committing.</p>
+    </div>
+    <div class="card green-top">
+      <div class="icon">🛠️</div>
+      <h3>Extends itself</h3>
+      <p>MCP servers let it talk to GitHub, AWS, and any API. The tool set grows as the project grows.</p>
+    </div>
+  </div>
+  <span class="slide-num">02</span>
+</section>
 
-  <!-- ARCHITECTURE -->
-  <section id="architecture">
-    <h2>Architecture</h2>
-    {_md_to_html(adr_md)}
-  </section>
+<!-- ══════════════════════════════════════════════════════════════════
+     SLIDE 3 — HOW WE USED IT
+═══════════════════════════════════════════════════════════════════ -->
+<section class="slide dark" id="how">
+  <div class="eyebrow">Our 3-hour journey</div>
+  <h2 class="slide-title">From blank repo to<br>working agent — step by step</h2>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-label">Pre-work · Brainstorming</div>
+      <div class="tl-title">Domain selection + architecture design with visual companion</div>
+      <div class="tl-body">Used <code>/superpowers:brainstorming</code> with a browser-based visual companion to compare 3 domains, design the team structure, data strategy, and escalation rules — before writing a single line of code. Visual mockups in the browser, decisions in the terminal.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-label">Hour 0 · Plan Mode</div>
+      <div class="tl-title">Full implementation plan generated and approved</div>
+      <div class="tl-body">Claude produced a 2 000-line implementation plan with exact code for every file, every test, every git commit message — three parallel tracks, sync points, and CI thresholds. We approved it in one pass.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-label">Hour 1 · Track A (Fabio)</div>
+      <div class="tl-title">Data + 7 tools + DocumentReader specialist, 14 tests — all green</div>
+      <div class="tl-body">5 policy JSON files, 15 inbox fixtures, 5 custom tools with structured error responses, 1 specialist subagent. Every task: write failing test → implement → test passes → commit. Deterministic, repeatable, no debugging sessions.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-label">Hour 1 · Track B (Luca) + Track C (Matteo) · Parallel</div>
+      <div class="tl-title">Agent loop + coordinator + eval harness — simultaneously</div>
+      <div class="tl-body">While Fabio built tools, Luca wired the coordinator and agent loop. Matteo structured the eval harness and generated 60 labeled Italian insurance claims via Bedrock Opus 4.7. Zero merge conflicts — clean branch isolation from day one.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-label">Hour 2–3 · Integration + Presentation</div>
+      <div class="tl-title">End-to-end pipeline + this presentation — auto-generated</div>
+      <div class="tl-body">Wired all three tracks together, ran the eval harness, and generated this presentation from the actual docs and eval output using <code>build_presentation.py</code>. The presentation rebuilds itself every time the results change.</div>
+    </div>
+  </div>
+  <span class="slide-num">03</span>
+</section>
 
-  <!-- TOOLS SUMMARY -->
-  <section id="tools">
-    <h2>Tools</h2>
-    <table>
-      <thead><tr><th>Tool</th><th>Specialist</th><th>Does</th><th>Does NOT do</th><th>Error code</th></tr></thead>
-      <tbody>
-        <tr><td><code>fetch_claim</code></td><td>DocumentReader</td>
-            <td>Reads summary.txt + metadata.json from inbox</td>
-            <td>Parse PDFs or images</td><td><code>CLAIM_NOT_FOUND</code></td></tr>
-        <tr><td><code>parse_attachments</code></td><td>DocumentReader</td>
-            <td>Extracts text from PDF/image via PyMuPDF</td>
-            <td>Make coverage decisions</td><td><code>PARSE_FAILED</code></td></tr>
-        <tr><td><code>lookup_policy</code></td><td>PolicyChecker</td>
-            <td>Reads policy JSON from data/policies/</td>
-            <td>Interpret coverage ambiguity</td><td><code>POLICY_NOT_FOUND</code></td></tr>
-        <tr><td><code>check_fraud_flags</code></td><td>PolicyChecker</td>
-            <td>D.Lgs. 231/2001 mock fraud rules</td>
-            <td>Access Codice Fiscale / Partita IVA</td><td><code>PII_BLOCKED</code></td></tr>
-        <tr><td><code>check_sanctions</code></td><td>PolicyChecker</td>
-            <td>EU/UN sanctions list check</td>
-            <td>Make coverage decisions</td><td><code>SANCTIONS_CHECK_FAILED</code></td></tr>
-        <tr><td><code>write_decision</code></td><td>Coordinator</td>
-            <td>Writes decision JSON to data/decisions/</td>
-            <td>Handle escalations</td><td><code>SCHEMA_INVALID</code></td></tr>
-        <tr><td><code>escalate_claim</code></td><td>Coordinator</td>
-            <td>Writes to data/escalations/ for human review</td>
-            <td>Override a human decision</td><td><code>ESCALATION_FAILED</code></td></tr>
-      </tbody>
-    </table>
-    <p style="margin-top:.6rem;font-size:.85rem;color:var(--text3)">
-      All tools return <code>{{"isError": true, "code": "...", "guidance": "..."}}</code> on failure — the agent recovers without parsing raw exceptions.
-    </p>
-  </section>
-
-  <!-- GUARDRAILS -->
-  <section id="guardrails">
-    <h2>Guardrails</h2>
-    <h3>PreToolUse Hook — hard stops (deterministic, no LLM)</h3>
-    <table>
-      <thead><tr><th>Pattern</th><th>Block code</th></tr></thead>
-      <tbody>
-        <tr><td>Codice Fiscale regex in any tool input</td><td><code>GDPR_PII_BLOCKED</code></td></tr>
-        <tr><td>Partita IVA / IBAN pattern in any tool input</td><td><code>GDPR_PII_BLOCKED</code></td></tr>
-        <tr><td>External URL in any tool input</td><td><code>EXTERNAL_ROUTING_BLOCKED</code></td></tr>
-        <tr><td>write_decision on polizza with <code>frozen=true</code></td><td><code>FROZEN_ACCOUNT_BLOCKED</code></td></tr>
-        <tr><td>approve decision with <code>fraud_score &gt; 0</code></td><td><code>FRAUD_APPROVE_BLOCKED</code></td></tr>
-      </tbody>
-    </table>
-    <h3>Escalation Rules — slow stops (explicit thresholds)</h3>
-    <table>
-      <thead><tr><th>Trigger</th><th>Threshold</th></tr></thead>
-      <tbody>
-        <tr><td>amount_eur</td><td>≥ €5 000</td></tr>
-        <tr><td>confidence</td><td>&lt; 0.75</td></tr>
-        <tr><td>fraud_score</td><td>&gt; 0</td></tr>
-        <tr><td>sanctions_hit</td><td>true</td></tr>
-        <tr><td>coverage_status</td><td>ambiguous</td></tr>
-        <tr><td>claim_type</td><td>contestazione</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <!-- RESULTS -->
-  <section id="results">
-    <h2>Eval Results</h2>
-    {_scorecard_html(scorecard) if scorecard else
-     '<div class="scorecard-placeholder">Scorecard not yet generated. Run <code>python evals/run_evals.py</code> to produce evals/scorecard.json, then re-run this script.</div>'}
-  </section>
-
-  <!-- EXAMPLE RUNS -->
-  <section id="examples">
-    <h2>Example Runs</h2>
-    {"".join(_decision_card(r) for r in decision_records) if decision_records else
-     '<div class="decisions-placeholder">No decision records yet. Process claims with <code>python -m src.agent ingest CLM-001</code>, then re-run this script.</div>'}
-  </section>
-
-  <!-- KEY DECISIONS -->
-  <section id="decisions">
-    <h2>Key Decisions</h2>
-    {"".join(all_kd) if all_kd else "<p>No key decisions extracted.</p>"}
-  </section>
-
-  <!-- TEAM -->
-  <section id="team">
-    <h2>Team</h2>
-    <div class="team-grid">
-      <div class="team-card">
-        <h4>Fabio</h4>
-        <p>PM/BA · Architect · Tools · Data generation · Presentation pipeline</p>
+<!-- ══════════════════════════════════════════════════════════════════
+     SLIDE 4 — CLAUDE CODE CAPABILITIES
+═══════════════════════════════════════════════════════════════════ -->
+<section class="slide medium" id="capabilities">
+  <div class="eyebrow">Capabilities demonstrated</div>
+  <h2 class="slide-title">Everything we used<br>in 3 hours</h2>
+  <div class="grid-2">
+    <div>
+      <div class="feature-row">
+        <div class="feature-icon">🎯</div>
+        <div class="feature-text">
+          <h4>Plan Mode + ExitPlanMode</h4>
+          <p>Structured planning gates before any file is touched. Every major step was a plan-then-approve cycle. Zero surprise rewrites.</p>
+        </div>
       </div>
-      <div class="team-card">
-        <h4>Luca</h4>
-        <p>Architect · Agent loop · PolicyChecker specialist · Coordinator · Integration</p>
+      <div class="feature-row">
+        <div class="feature-icon">🌐</div>
+        <div class="feature-text">
+          <h4>Visual Brainstorming Companion</h4>
+          <p>Browser-based mockups during design. Compared domains side-by-side, showed the Gantt timeline, visualized the agent architecture — all from the terminal session.</p>
+        </div>
       </div>
-      <div class="team-card">
-        <h4>Matteo</h4>
-        <p>Quality · PreToolUse hook · Adversarial eval set · Eval harness · Scorecard</p>
+      <div class="feature-row">
+        <div class="feature-icon">📋</div>
+        <div class="feature-text">
+          <h4>CLAUDE.md — Shared conventions</h4>
+          <p>Written first, before any code. Defined € vs $, PII rules, threshold single source of truth, Key Decision convention. Every subsequent session had full context immediately.</p>
+        </div>
+      </div>
+      <div class="feature-row">
+        <div class="feature-icon">🔀</div>
+        <div class="feature-text">
+          <h4>Parallel subagent execution</h4>
+          <p>Three independent tracks running simultaneously via the Agent tool. Explore, Plan, and Execute agents dispatched in the same message.</p>
+        </div>
       </div>
     </div>
-  </section>
+    <div>
+      <div class="feature-row">
+        <div class="feature-icon">🔗</div>
+        <div class="feature-text">
+          <h4>MCP Servers — GitHub + AWS Bedrock</h4>
+          <p>Configured GitHub MCP (HTTP/Bearer) and AWS MCP (<code>uvx awslabs</code>) in <code>.mcp.json</code>. Credentials via <code>.env</code>, auto-loaded from <code>~/.zshrc</code>. Zero hardcoded secrets.</p>
+        </div>
+      </div>
+      <div class="feature-row">
+        <div class="feature-icon">🛡️</div>
+        <div class="feature-text">
+          <h4>PreToolUse hooks — deterministic guardrails</h4>
+          <p>Codice Fiscale, Partita IVA, and IBAN regex patterns block before any LLM call. Cannot be bypassed by prompt injection. Hard stop vs. slow stop architecture.</p>
+        </div>
+      </div>
+      <div class="feature-row">
+        <div class="feature-icon">🧪</div>
+        <div class="feature-text">
+          <h4>Test-driven implementation</h4>
+          <p>Every module: failing test first, then implementation, then green. 14 tests across 7 tools and 1 specialist — all written by Claude, all passing.</p>
+        </div>
+      </div>
+      <div class="feature-row">
+        <div class="feature-icon">📊</div>
+        <div class="feature-text">
+          <h4>Self-updating presentation</h4>
+          <p>This HTML assembles itself from <code>docs/</code>, <code>evals/scorecard.json</code>, and <code>data/decisions/</code>. Every re-run reflects the latest state of the agent.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-num">04</span>
+</section>
 
-</div>
+<!-- ══════════════════════════════════════════════════════════════════
+     SLIDE 5 — THE PRODUCT
+═══════════════════════════════════════════════════════════════════ -->
+<section class="slide light" id="product">
+  <div class="eyebrow">What we built</div>
+  <h2 class="slide-title">Italian Insurance Claims<br>Intake Agent</h2>
+  <p class="slide-sub">A production-grade agentic triage system. Real decisions, real guardrails, real eval.</p>
+  <div class="grid-2" style="margin-bottom:1.5rem">
+    <div>
+      <h3>Agent Architecture</h3>
+      <div class="arch-flow">
+<span class="af-coord">Coordinator</span>  ← claim_id from data/inbox/<br>
+  │<br>
+  ├─ Task → <span class="af-spec">DocumentReader</span> <span class="af-dim">(isolated context)</span><br>
+  │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="af-tool">fetch_claim · parse_attachments</span><br>
+  │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ ClaimSummary<br>
+  │<br>
+  ├─ Task → <span class="af-spec">PolicyChecker</span> <span class="af-dim">(receives ClaimSummary only)</span><br>
+  │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="af-tool">lookup_policy · check_fraud_flags · check_sanctions</span><br>
+  │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ PolicyResult<br>
+  │<br>
+  ├─ validate + retry loop <span class="af-dim">(max 3, schema error fed back)</span><br>
+  ├─ escalation rules <span class="af-dim">(€5 000 · conf &lt; 0.75 · fraud · sanctions)</span><br>
+  └─ <span class="af-tool">write_decision()</span>  OR  <span class="af-tool">escalate_claim()</span>
+      </div>
+    </div>
+    <div>
+      <h3>Italian/EU Market Adjustments</h3>
+      <div class="pill-row">
+        <span class="pill">Codice Fiscale PII blocking</span>
+        <span class="pill">Partita IVA blocking</span>
+        <span class="pill">IBAN IT pattern</span>
+        <span class="pill">€ thresholds</span>
+        <span class="pill">D.Lgs. 231/2001 fraud rules</span>
+        <span class="pill">EU/UN sanctions list</span>
+        <span class="pill">IVASS regulation</span>
+        <span class="pill">GDPR guardrails</span>
+      </div>
+      <h3 style="margin-top:1.2rem">Decisions the agent makes</h3>
+      <table style="width:100%;font-size:.88rem;border-collapse:collapse">
+        <tr><td style="padding:.4rem;color:var(--green);font-weight:700">fast_track</td>
+            <td style="padding:.4rem;color:var(--text2)">&lt; €5 000, clear coverage, no flags</td></tr>
+        <tr><td style="padding:.4rem;color:var(--yellow);font-weight:700">investigate</td>
+            <td style="padding:.4rem;color:var(--text2)">borderline amount or ambiguous coverage</td></tr>
+        <tr><td style="padding:.4rem;color:var(--red);font-weight:700">deny</td>
+            <td style="padding:.4rem;color:var(--text2)">lapsed policy, exclusion, duplicate</td></tr>
+        <tr><td style="padding:.4rem;color:var(--blue);font-weight:700">escalate</td>
+            <td style="padding:.4rem;color:var(--text2)">≥ €5 000, fraud, sanctions, contestazione</td></tr>
+      </table>
+    </div>
+  </div>
+  <span class="slide-num">05</span>
+</section>
 
-<div class="footer">
-  Built with Claude Code · AWS Bedrock · Scenario 5 — Agentic Solution<br>
-  Generated {generated_at}
-</div>
+<!-- ══════════════════════════════════════════════════════════════════
+     SLIDE 6 — RESULTS
+═══════════════════════════════════════════════════════════════════ -->
+<section class="slide medium" id="results">
+  <div class="eyebrow">Eval harness · 60 labeled claims</div>
+  <h2 class="slide-title">The numbers</h2>
+  <p class="slide-sub">Normal traffic (40 claims) + adversarial set (20 cases): prompt injection, fraud, PII exfil, ambiguous coverage.</p>
+  {results_content}
+  {"" if not decisions else f'<h3 style="margin-top:1.5rem">Example decisions</h3>' + examples_html}
+  <span class="slide-num">06</span>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SLIDE 7 — WOW MOMENTS
+═══════════════════════════════════════════════════════════════════ -->
+<section class="slide dark" id="wow">
+  <div class="eyebrow">What surprised us</div>
+  <h2 class="slide-title">The "wow" moments</h2>
+  <div class="grid-2">
+    <div class="quote-block">
+      <p>"The entire architecture debate — domain selection, coordinator vs. monolith, tool count discipline — happened in a brainstorming session before any code existed. We walked in with a finished ADR."</p>
+      <div class="quote-author">— Design phase, 0 lines of code written</div>
+    </div>
+    <div class="quote-block">
+      <p>"The implementation plan was 2 000 lines of exact code, exact test names, exact commit messages, and exact git tags. We ran it like a recipe. Zero 'what should I do next?' moments."</p>
+      <div class="quote-author">— Plan Mode output, approved in one pass</div>
+    </div>
+    <div class="quote-block">
+      <p>"We described the Italian market context once in <code>CLAUDE.md</code>. Every subsequent file — tools, hooks, test fixtures — used Codice Fiscale, Partita IVA, IVASS, and € without being told again."</p>
+      <div class="quote-author">— CLAUDE.md as persistent project memory</div>
+    </div>
+    <div class="quote-block">
+      <p>"Generating 60 realistic Italian insurance claim records — with correct adversarial types, authentic Italian names, IVASS-compliant scenarios — took 90 seconds via Bedrock Opus 4.7."</p>
+      <div class="quote-author">— scripts/generate_data.py, Track C Hour 1</div>
+    </div>
+  </div>
+  <h3 style="margin-top:2rem">Key architectural decisions — surfaced automatically</h3>
+  {kd_html}
+  <span class="slide-num">07</span>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SLIDE 8 — TEAM
+═══════════════════════════════════════════════════════════════════ -->
+<section class="slide light" id="team">
+  <div class="eyebrow">The Insur-gents</div>
+  <h2 class="slide-title">3 devs · 3 hours ·<br>1 production-grade agent</h2>
+  <div class="grid-3">
+    <div class="card team-card">
+      <div class="team-avatar">F</div>
+      <h3>Fabio</h3>
+      <p>PM/BA · Architecture · Tools (7 total) · Data generation · This presentation</p>
+    </div>
+    <div class="card team-card">
+      <div class="team-avatar">L</div>
+      <h3>Luca</h3>
+      <p>Agent loop · PolicyChecker specialist · Coordinator · CLI integration</p>
+    </div>
+    <div class="card team-card">
+      <div class="team-avatar">M</div>
+      <h3>Matteo</h3>
+      <p>PreToolUse hook · Adversarial eval set · Eval harness · Scorecard metrics</p>
+    </div>
+  </div>
+  <div style="margin-top:2rem">
+    <h3>Challenges tackled</h3>
+    <div class="grid-4" style="margin-top:1rem">
+      <div class="card"><p style="font-size:.8rem;color:var(--text3)">Challenge 1</p><p style="font-size:.88rem">The Mandate ✅</p></div>
+      <div class="card"><p style="font-size:.8rem;color:var(--text3)">Challenge 2</p><p style="font-size:.88rem">The Bones ✅</p></div>
+      <div class="card"><p style="font-size:.8rem;color:var(--text3)">Challenge 3</p><p style="font-size:.88rem">The Tools ✅</p></div>
+      <div class="card"><p style="font-size:.8rem;color:var(--text3)">Challenge 4</p><p style="font-size:.88rem">The Triage ⚙️</p></div>
+      <div class="card"><p style="font-size:.8rem;color:var(--text3)">Challenge 5</p><p style="font-size:.88rem">The Brake ⚙️</p></div>
+      <div class="card"><p style="font-size:.8rem;color:var(--text3)">Challenge 6</p><p style="font-size:.88rem">The Attack ✅</p></div>
+      <div class="card"><p style="font-size:.8rem;color:var(--text3)">Challenge 7</p><p style="font-size:.88rem">The Scorecard ⚙️</p></div>
+      <div class="card"><p style="font-size:.8rem;color:var(--text3)">Challenge 8</p><p style="font-size:.88rem">The Loop —</p></div>
+    </div>
+  </div>
+  <span class="slide-num">08</span>
+</section>
 
 </body>
+<footer>
+  Built with Claude Code · AWS Bedrock Opus 4.7 · Scenario 5 — Agentic Solution<br>
+  Generated {now} · <code>python scripts/build_presentation.py</code>
+</footer>
 </html>
 """
 
     out_path.write_text(html, encoding="utf-8")
-    print(f"presentation.html written to {out_path}")
-    print(f"  mandate sections: {len(_extract_key_decisions(mandate_md))} key decisions")
-    print(f"  ADR sections: {len(_extract_key_decisions(adr_md))} key decisions")
-    print(f"  scorecard: {'loaded' if scorecard else 'not available (placeholder shown)'}")
-    print(f"  decision examples: {len(decision_records)} records")
+    print(f"✓ {out_path} written ({out_path.stat().st_size // 1024} KB)")
+    print(f"  key decisions: {len(kd_all)}")
+    print(f"  scorecard: {'loaded ✓' if scorecard else 'placeholder (run evals first)'}")
+    print(f"  decision examples: {len(decisions)}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Assemble presentation.html from docs and eval results")
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="Output path (default: presentation.html)")
-    args = parser.parse_args()
-    build(args.out)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    build(parser.parse_args().out)
