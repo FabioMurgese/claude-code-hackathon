@@ -311,6 +311,17 @@ a { color: var(--ac) }
 .t-dim    { color: #6666888; font-size: .75rem }
 .demo-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.1rem; margin-top: 1.3rem }
 
+/* ── RUN BUTTON ─────────────────────────────────────────── */
+.run-btn {
+  margin-left: auto; background: rgba(161,0,255,.25);
+  border: 1px solid rgba(161,0,255,.5); color: #cc66ff;
+  font-size: .72rem; font-weight: 700; padding: .2em .7em;
+  border-radius: 5px; cursor: pointer; transition: all .15s;
+  font-family: inherit;
+}
+.run-btn:hover:not(:disabled) {{ background: rgba(161,0,255,.45) }}
+.run-btn:disabled {{ opacity: .5; cursor: not-allowed }}
+
 footer {
   text-align: center; padding: 2rem var(--pad);
   color: var(--text3); font-size: .76rem; border-top: 1px solid var(--border);
@@ -600,9 +611,11 @@ def build(out_path: Path) -> None:
   <span class="slide-num">05 / 08</span>
   <div class="eyebrow">Live demo — run it yourself</div>
   <h2 class="slide-title">Three claims. Three outcomes.<br>One command each.</h2>
-  <p class="slide-sub" style="margin-bottom:1rem">
-    AWS credentials required: <code>aws login &amp;&amp; source .env</code> — then pick a scenario.
+  <p class="slide-sub" style="margin-bottom:.6rem">
+    Start the demo server first, then click <strong>▶ Run</strong> on any panel.
   </p>
+  <pre style="font-size:.78rem;margin-bottom:1.2rem;display:inline-block"><code>aws login &amp;&amp; source .env
+.venv/bin/python scripts/demo_server.py   # keep this running</code></pre>
   <div class="demo-grid">
 
     <!-- Scenario 1: fast_track -->
@@ -612,22 +625,10 @@ def build(out_path: Path) -> None:
         <div class="terminal-bar">
           <div class="t-dot red"></div><div class="t-dot amber"></div><div class="t-dot green"></div>
           <span class="terminal-label">CLM-001 · RCA auto · €800</span>
+          <button class="run-btn" onclick="runClaim('CLM-001','out-1')">▶ Run</button>
         </div>
-        <div class="terminal-body">
-<span class="t-prompt">$</span> <span class="t-cmd">python -m src.agent ingest CLM-001</span>
-
-<span class="t-dim"># Claim: "Tamponamento lieve in via Roma 12.</span>
-<span class="t-dim">#  Danno paraurti posteriore €800. Polizza RCA</span>
-<span class="t-dim">#  valida, nessuna esclusione applicabile."</span>
-
-<span class="t-key">"decision"</span>:    <span class="t-green">"fast_track"</span>,
-<span class="t-key">"category"</span>:    <span class="t-str">"sinistro_auto"</span>,
-<span class="t-key">"confidence"</span>:  <span class="t-num">0.95</span>,
-<span class="t-key">"retry_count"</span>: <span class="t-num">0</span>,
-<span class="t-key">"rationale"</span>: <span class="t-str">"Copertura chiara,
-  importo €800 sotto soglia €5.000.
-  Nessun flag frode né sanzioni."</span>
-        </div>
+        <div class="terminal-body" id="out-1"><span class="t-dim"># click ▶ Run to execute</span>
+<span class="t-dim"># python -m src.agent ingest CLM-001</span></div>
       </div>
     </div>
 
@@ -638,21 +639,10 @@ def build(out_path: Path) -> None:
         <div class="terminal-bar">
           <div class="t-dot red"></div><div class="t-dot amber"></div><div class="t-dot green"></div>
           <span class="terminal-label">CLM-010 · RC professionale · €6 500</span>
+          <button class="run-btn" onclick="runClaim('CLM-010','out-2')">▶ Run</button>
         </div>
-        <div class="terminal-body">
-<span class="t-prompt">$</span> <span class="t-cmd">python -m src.agent ingest CLM-010</span>
-
-<span class="t-dim"># Claim: "Errore professionale con danno</span>
-<span class="t-dim">#  a terzi €6.500. Importo sopra soglia.</span>
-<span class="t-dim">#  Clausola interpretabile."</span>
-
-<span class="t-key">"status"</span>: <span class="t-amber">"pending_human_review"</span>,
-<span class="t-key">"escalation_reason"</span>: <span class="t-str">
-  "amount_eur 6500.0 &gt;=
-   threshold 5000.0"</span>,
-<span class="t-key">"tentative_decision"</span>: <span class="t-str">"investigate"</span>,
-<span class="t-key">"confidence"</span>: <span class="t-num">0.82</span>
-        </div>
+        <div class="terminal-body" id="out-2"><span class="t-dim"># click ▶ Run to execute</span>
+<span class="t-dim"># python -m src.agent ingest CLM-010</span></div>
       </div>
     </div>
 
@@ -662,32 +652,92 @@ def build(out_path: Path) -> None:
       <div class="terminal">
         <div class="terminal-bar">
           <div class="t-dot red"></div><div class="t-dot amber"></div><div class="t-dot green"></div>
-          <span class="terminal-label">CLM-014 · frozen polizza</span>
+          <span class="terminal-label">EVAL-A-001 · prompt injection</span>
+          <button class="run-btn" onclick="runClaim('EVAL-A-001','out-3')">▶ Run</button>
         </div>
-        <div class="terminal-body">
-<span class="t-prompt">$</span> <span class="t-cmd">python -m src.agent ingest CLM-014</span>
-
-<span class="t-dim"># Claim: "Sinistro auto €3.300.</span>
-<span class="t-dim">#  Polizza contrassegnata come frozen."</span>
-<span class="t-dim">#  PreToolUse hook → write_decision blocked.</span>
-<span class="t-dim">#  Escalation rule → ambiguous coverage.</span>
-
-<span class="t-key">"status"</span>: <span class="t-amber">"pending_human_review"</span>,
-<span class="t-key">"escalation_reason"</span>: <span class="t-str">
-  "coverage_status ambiguous:
-   polizza silente sul tipo
-   di evento"</span>
-        </div>
+        <div class="terminal-body" id="out-3"><span class="t-dim"># click ▶ Run to execute</span>
+<span class="t-dim"># python -m src.agent ingest EVAL-A-001</span></div>
       </div>
     </div>
 
   </div>
-  <p style="margin-top:1.2rem;font-size:.82rem;color:var(--text3)">
-    Want to try an adversarial case?
-    <code>python -m src.agent ingest EVAL-A-001</code> — contains a prompt injection in the claim body.
-    The agent escalates rather than following the injected instruction.
+
+  <p id="demo-status" style="margin-top:.9rem;font-size:.8rem;color:var(--text3)">
+    Server not detected — run the command above, then refresh. &nbsp;
+    <a href="#" onclick="checkServer();return false">Retry</a>
   </p>
 </section>
+
+<script>
+const SERVER = 'http://localhost:7331';
+
+function colour(val) {{
+  if (typeof val === 'string') {{
+    if (['fast_track','auto_resolve'].includes(val)) return 'class="t-green"';
+    if (['deny'].includes(val)) return 'class="t-red"';
+    if (val === 'pending_human_review') return 'class="t-amber"';
+    return 'class="t-str"';
+  }}
+  if (typeof val === 'number') return 'class="t-num"';
+  if (typeof val === 'boolean') return 'class="t-amber"';
+  return '';
+}}
+
+function renderJSON(obj, indent) {{
+  if (obj === null) return '<span class="t-dim">null</span>';
+  if (typeof obj !== 'object') {{
+    const c = colour(obj);
+    const v = JSON.stringify(obj);
+    return c ? `<span ${{c}}>${{v}}</span>` : v;
+  }}
+  const pad = '  '.repeat(indent + 1);
+  const closePad = '  '.repeat(indent);
+  const entries = Object.entries(obj).map(([k, v]) =>
+    `${{pad}}<span class="t-key">"${{k}}"</span>: ${{renderJSON(v, indent + 1)}}`
+  );
+  return `{{\n${{entries.join(',\n')}}\n${{closePad}}}}`;
+}}
+
+async function runClaim(claimId, outId) {{
+  const el = document.getElementById(outId);
+  const btn = el.closest('.terminal').querySelector('.run-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  el.innerHTML = '<span class="t-dim"># running — this takes ~10-20s via Bedrock…</span>';
+  try {{
+    const r = await fetch(`${{SERVER}}/run?claim=${{claimId}}`, {{ signal: AbortSignal.timeout(140000) }});
+    const data = await r.json();
+    if (data.error) {{
+      el.innerHTML = `<span class="t-red">ERROR: ${{data.error}}</span>`;
+    }} else if (data.parsed) {{
+      el.innerHTML = renderJSON(data.parsed, 0);
+    }} else {{
+      el.innerHTML = `<span class="t-dim">${{data.raw || 'no output'}}</span>`;
+    }}
+    if (data.stderr) {{
+      el.innerHTML += `\n<span class="t-dim">${{data.stderr.slice(-200)}}</span>`;
+    }}
+  }} catch (err) {{
+    el.innerHTML = `<span class="t-red">Could not reach demo server.</span>\n<span class="t-dim">Start it with:\n.venv/bin/python scripts/demo_server.py</span>`;
+  }} finally {{
+    btn.disabled = false;
+    btn.textContent = '▶ Run';
+  }}
+}}
+
+async function checkServer() {{
+  const el = document.getElementById('demo-status');
+  try {{
+    const r = await fetch(`${{SERVER}}/health`, {{ signal: AbortSignal.timeout(2000) }});
+    if (r.ok) {{
+      el.innerHTML = '<span style="color:var(--green)">✓ Demo server ready — click any ▶ Run button.</span>';
+    }}
+  }} catch {{
+    el.innerHTML = 'Server not detected — run the command above, then <a href="#" onclick="checkServer();return false">retry</a>.';
+  }}
+}}
+checkServer();
+</script>
 
 <!-- ══════ 06 · RESULTS ═══════════════════════════════════ -->
 <section class="slide" id="results">
