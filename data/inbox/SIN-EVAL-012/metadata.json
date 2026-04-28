@@ -1,0 +1,10 @@
+{
+  "id": "SIN-EVAL-012",
+  "policy_id": "incendio_casa",
+  "amount_eur": 2400,
+  "claimant_id": "CLT-EVAL-012",
+  "incident_date": "2024-02-28",
+  "frozen": false,
+  "in_contenzioso": false,
+  "claim_id": "SIN-EVAL-012"
+}

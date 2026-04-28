@@ -1,0 +1,10 @@
+{
+  "id": "SIN-EVAL-033",
+  "policy_id": "infortuni",
+  "amount_eur": 2800,
+  "claimant_id": "CLT-EVAL-033",
+  "incident_date": "2024-04-06",
+  "frozen": false,
+  "in_contenzioso": false,
+  "claim_id": "SIN-EVAL-033"
+}

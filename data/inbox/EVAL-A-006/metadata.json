@@ -1,0 +1,9 @@
+{
+  "id": "EVAL-A-006",
+  "policy_id": "RCA_auto",
+  "amount_eur": 15000,
+  "claimant_id": "CLT-20145",
+  "frozen": false,
+  "in_contenzioso": false,
+  "claim_id": "EVAL-A-006"
+}

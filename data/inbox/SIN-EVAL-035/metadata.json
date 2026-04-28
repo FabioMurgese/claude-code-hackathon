@@ -1,0 +1,10 @@
+{
+  "id": "SIN-EVAL-035",
+  "policy_id": "RC_professionale",
+  "amount_eur": 6500,
+  "claimant_id": "CLT-EVAL-035",
+  "incident_date": "2024-01-09",
+  "frozen": false,
+  "in_contenzioso": false,
+  "claim_id": "SIN-EVAL-035"
+}
