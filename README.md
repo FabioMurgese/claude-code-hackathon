@@ -1,3 +1,27 @@
+# Insurance Claims Intake Agent
+
+**Hackathon scenario:** Scenario 5 — Agentic Solution
+**Domain:** Insurance claims triage (Italian/EU market)
+**Stack:** Python · Claude Agent SDK · PyMuPDF
+**Team:** 3 devs · 3 hours
+
+## What it does
+Reads inbound insurance claims from `data/inbox/`, classifies each as `fast_track` / `investigate` / `deny`, enriches with policy lookup and fraud checks (D.Lgs. 231/2001), and routes to a human when confidence or euro amount exceeds thresholds. Every decision is logged with a full reasoning chain.
+
+## How to run
+```bash
+pip install -e ".[dev]"
+python -m src.agent ingest claim_dev_001    # process one claim
+python evals/run_evals.py                   # run full eval suite + scorecard
+python scripts/build_presentation.py        # assemble presentation.html
+```
+
+## Repo structure
+See [CLAUDE.md](CLAUDE.md) for full layout and conventions.
+See [docs/superpowers/specs/2026-04-28-claims-agent-design.md](docs/superpowers/specs/2026-04-28-claims-agent-design.md) for the full design spec.
+
+---
+
 # Claude Code Hackathon
 
 ## The Point
