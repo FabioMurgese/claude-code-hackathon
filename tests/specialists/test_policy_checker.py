@@ -1,5 +1,6 @@
 import json
 from unittest.mock import patch
+from langchain_core.messages import AIMessage
 from src.specialists.policy_checker import run_policy_checker
 
 _CLAIM = {
@@ -15,7 +16,9 @@ _MOCK_RESULT = {
 
 
 def test_returns_policy_result():
-    with patch("src.specialists.policy_checker.run_agent_loop", return_value=json.dumps(_MOCK_RESULT)):
+    mock_state = {"messages": [AIMessage(content=json.dumps(_MOCK_RESULT))]}
+    with patch("src.specialists.policy_checker._graph") as mock_graph:
+        mock_graph.invoke.return_value = mock_state
         result = run_policy_checker(_CLAIM)
     assert result["coverage_status"] == "covered"
     assert result["fraud_score"] == 0

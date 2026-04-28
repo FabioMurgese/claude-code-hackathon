@@ -1,21 +1,29 @@
 """
-PolicyChecker specialist.
+PolicyChecker specialist — LangGraph implementation.
 
 Tools: lookup_policy, check_fraud_flags, check_sanctions.
-Returns: PolicyResult(coverage_status, fraud_score, exclusions, sanctions_hit).
+Returns: PolicyResult dict.
 
-Receives a serialized ClaimSummary via Task prompt — never sees raw coordinator
-context. Does NOT have access to inbox files.
+Graph: HumanMessage → llm_node ↔ safe_tools (cycle) → end_turn → return JSON.
+Context isolation: fresh state per invocation.
 
 Owner: Person B
 """
 
 import json
-from src.agent.loop import run_agent_loop
-from src.hooks.pre_tool_use import check_pre_tool_use
-from src.tools.lookup_policy import lookup_policy, LOOKUP_POLICY_SCHEMA
-from src.tools.check_fraud_flags import check_fraud_flags, CHECK_FRAUD_SCHEMA
-from src.tools.check_sanctions import check_sanctions, CHECK_SANCTIONS_SCHEMA
+from typing import Annotated
+from typing_extensions import TypedDict
+
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.tools import StructuredTool
+from langgraph.graph import StateGraph, END
+from langgraph.graph.message import add_messages
+
+from src.agent.graph_utils import build_chat_model, MaxTokensError
+from src.agent.tools_node import SafeToolNode
+from src.tools.lookup_policy import lookup_policy
+from src.tools.check_fraud_flags import check_fraud_flags
+from src.tools.check_sanctions import check_sanctions
 
 _SYSTEM = """Sei il PolicyChecker specialist del sistema di triage sinistri.
 Ricevi un ClaimSummary JSON e devi verificare copertura, frodi e sanzioni.
@@ -35,30 +43,57 @@ FORMATO OUTPUT:
   "policy_notes": "..."
 }"""
 
-_TOOLS = [LOOKUP_POLICY_SCHEMA, CHECK_FRAUD_SCHEMA, CHECK_SANCTIONS_SCHEMA]
-_TOOL_FNS = {
-    "lookup_policy": lookup_policy,
-    "check_fraud_flags": check_fraud_flags,
-    "check_sanctions": check_sanctions,
-}
+_tools = [
+    StructuredTool.from_function(lookup_policy, name="lookup_policy", description="Verifica polizza"),
+    StructuredTool.from_function(check_fraud_flags, name="check_fraud_flags", description="Controlla flag D.Lgs. 231/2001"),
+    StructuredTool.from_function(check_sanctions, name="check_sanctions", description="Controlla lista sanzioni EU/UN"),
+]
+_safe_tools = SafeToolNode(_tools)
+_llm = build_chat_model().bind_tools(_tools)
+
+
+class _State(TypedDict):
+    messages: Annotated[list, add_messages]
+
+
+def _llm_node(state: _State) -> dict:
+    response = _llm.invoke(state["messages"])
+    if isinstance(response, AIMessage):
+        meta = response.response_metadata or {}
+        if meta.get("stop_reason") == "max_tokens":
+            raise MaxTokensError("PolicyChecker output truncated")
+    return {"messages": [response]}
+
+
+def _route(state: _State) -> str:
+    last = state["messages"][-1]
+    if isinstance(last, AIMessage) and last.tool_calls:
+        return "tools"
+    return END
+
+
+_graph = (
+    StateGraph(_State)
+    .add_node("llm", _llm_node)
+    .add_node("tools", _safe_tools)
+    .add_edge("tools", "llm")
+    .set_entry_point("llm")
+    .add_conditional_edges("llm", _route)
+    .compile()
+)
 
 
 def run_policy_checker(claim_summary: dict) -> dict:
-    """Run PolicyChecker in isolated context — receives ClaimSummary explicitly, no coordinator state."""
-    messages = [
-        {
-            "role": "user",
-            "content": (
-                f"Verifica copertura per questo sinistro: {json.dumps(claim_summary, ensure_ascii=False)}. "
-                "Usa gli strumenti disponibili e restituisci il JSON PolicyResult."
-            ),
-        }
+    """Run PolicyChecker in isolated context — receives ClaimSummary explicitly."""
+    init_messages = [
+        SystemMessage(content=_SYSTEM),
+        HumanMessage(content=(
+            f"Verifica copertura per questo sinistro: {json.dumps(claim_summary, ensure_ascii=False)}. "
+            "Usa gli strumenti disponibili e restituisci il JSON PolicyResult."
+        )),
     ]
-    result_text = run_agent_loop(
-        system=_SYSTEM,
-        tools=_TOOLS,
-        tool_functions=_TOOL_FNS,
-        messages=messages,
-        pre_tool_hook=check_pre_tool_use,
+    final_state = _graph.invoke({"messages": init_messages})
+    last_ai = next(
+        m for m in reversed(final_state["messages"]) if isinstance(m, AIMessage)
     )
-    return json.loads(result_text)
+    return json.loads(last_ai.content)
