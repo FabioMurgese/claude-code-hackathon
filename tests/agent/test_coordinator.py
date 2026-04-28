@@ -1,8 +1,10 @@
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+from langchain_core.messages import AIMessage
 import src.tools.write_decision as wd
 import src.tools.escalate_claim as ec
 from src.agent.coordinator import process_claim
+from src.agent.graph_utils import MaxTokensError
 
 _DOC = {
     "claim_id": "CLM-001", "summary_text": "Tamponamento lieve.", "amount_eur": 800.0,
@@ -14,10 +16,16 @@ _POL = {
     "coverage_status": "covered", "fraud_score": 0, "triggered_rules": [],
     "sanctions_hit": False, "exclusions_matched": [], "policy_valid": True,
 }
-_FAST = json.dumps({
+_FAST_JSON = json.dumps({
     "claim_id": "CLM-001", "decision": "fast_track", "category": "sinistro_auto",
     "confidence": 0.95, "rationale": "Copertura chiara, importo sotto soglia.",
 })
+
+
+def _mock_llm(response_json: str):
+    llm = MagicMock()
+    llm.invoke.return_value = AIMessage(content=response_json)
+    return llm
 
 
 def test_fast_track_decision(tmp_path, monkeypatch):
@@ -26,7 +34,7 @@ def test_fast_track_decision(tmp_path, monkeypatch):
     with (
         patch("src.agent.coordinator.run_document_reader", return_value=_DOC),
         patch("src.agent.coordinator.run_policy_checker", return_value=_POL),
-        patch("src.agent.coordinator.run_agent_loop", return_value=_FAST),
+        patch("src.agent.coordinator._llm", _mock_llm(_FAST_JSON)),
     ):
         result = process_claim("CLM-001")
     assert result["decision"] == "fast_track"
@@ -45,7 +53,7 @@ def test_high_amount_escalates(tmp_path, monkeypatch):
     with (
         patch("src.agent.coordinator.run_document_reader", return_value=doc_high),
         patch("src.agent.coordinator.run_policy_checker", return_value=_POL),
-        patch("src.agent.coordinator.run_agent_loop", return_value=dec_json),
+        patch("src.agent.coordinator._llm", _mock_llm(dec_json)),
     ):
         result = process_claim("CLM-010")
     assert result["status"] == "pending_human_review"
@@ -57,16 +65,19 @@ def test_validation_retry_on_bad_json(tmp_path, monkeypatch):
     monkeypatch.setattr(ec, "ESCALATIONS_PATH", tmp_path / "escalations")
     calls = {"n": 0}
 
-    def loop_side_effect(**kwargs):
+    def llm_side_effect(msgs):
         calls["n"] += 1
         if calls["n"] < 3:
-            return "not valid json"
-        return _FAST
+            return AIMessage(content="not valid json")
+        return AIMessage(content=_FAST_JSON)
+
+    mock_llm = MagicMock()
+    mock_llm.invoke.side_effect = llm_side_effect
 
     with (
         patch("src.agent.coordinator.run_document_reader", return_value=_DOC),
         patch("src.agent.coordinator.run_policy_checker", return_value=_POL),
-        patch("src.agent.coordinator.run_agent_loop", side_effect=loop_side_effect),
+        patch("src.agent.coordinator._llm", mock_llm),
     ):
         result = process_claim("CLM-001")
     assert result["decision"] == "fast_track"
@@ -74,7 +85,6 @@ def test_validation_retry_on_bad_json(tmp_path, monkeypatch):
 
 
 def test_max_tokens_escalates(tmp_path, monkeypatch):
-    from src.agent.loop import MaxTokensError
     monkeypatch.setattr(wd, "DECISIONS_PATH", tmp_path / "decisions")
     monkeypatch.setattr(ec, "ESCALATIONS_PATH", tmp_path / "escalations")
     with (
