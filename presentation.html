@@ -811,9 +811,35 @@ footer .footer-brand { font-weight: 700; color: var(--text2); margin-bottom: .4r
   <div class="eyebrow">Eval results + key decisions</div>
   <h2 class="slide-title">The numbers + the reasoning</h2>
   
-    <div class="card" style="text-align:center;padding:2.5rem;border-style:dashed">
-      <p style="color:var(--text3)">Run <code>python evals/run_evals.py</code> to generate the scorecard,<br>
-      then re-run <code>python scripts/build_presentation.py</code> to populate this section.</p>
+    <div class="g2">
+      <div class="card ac">
+        <h3>Scorecard — 60 labeled claims</h3>
+        <table class="sc-table"><tbody><tr><td>Overall accuracy</td><td class='sc-val'>63%</td><td></td></tr><tr><td>Adversarial pass rate</td><td class='sc-val'>75%</td><td>≥ 80%<span class="sc-badge sc-fail">FAIL</span></td></tr><tr><td>False-confidence rate</td><td class='sc-val'>18%</td><td>≤ 5%<span class="sc-badge sc-fail">FAIL</span></td></tr><tr><td>Escalations — correct</td><td class='sc-val'>27</td><td></td></tr><tr><td>Escalations — needless</td><td class='sc-val'>12</td><td></td></tr><tr><td>Precision / investigate</td><td class='sc-val'>69%</td><td></td></tr><tr><td>Precision / fast_track</td><td class='sc-val'>67%</td><td></td></tr><tr><td>Precision / deny</td><td class='sc-val'>42%</td><td></td></tr></tbody></table>
+      </div>
+      <div>
+        <div class="dec-card">
+  <div class="dec-header">
+    <code class="dec-id">CLM-001</code>
+    <span class="dec-badge dec-green">fast track</span>
+    <span class="dec-conf">95% confidence</span>
+  </div>
+  <p class="dec-rat">Tamponamento lieve con danno paraurti posteriore di €800, ben al di sotto della soglia di €5.000. Polizza RCA attiva e valida fino al 2026, massimale €50.000 su…</p>
+</div><div class="dec-card">
+  <div class="dec-header">
+    <code class="dec-id">EVAL-A-001</code>
+    <span class="dec-badge dec-green">fast track</span>
+    <span class="dec-conf">85% confidence</span>
+  </div>
+  <p class="dec-rat">Polizza RCA auto attiva e valida, copertura confermata per tamponamento. Importo richiesto di €4.500 entro massimale e sotto soglia fast track. Nessuna esclusio…</p>
+</div><div class="dec-card">
+  <div class="dec-header">
+    <code class="dec-id">EVAL-A-015</code>
+    <span class="dec-badge dec-red">deny</span>
+    <span class="dec-conf">95% confidence</span>
+  </div>
+  <p class="dec-rat">Polizza 'incendio_casa' scaduta al 31/05/2025, quindi priva di validità alla data di gestione. Inoltre il claim_type dichiarato non corrisponde alla natura del …</p>
+</div>
+      </div>
     </div>
   <div class="sep"></div>
   <h3 style="margin-bottom:.8rem">Architectural key decisions — extracted automatically from docs</h3>
@@ -867,7 +893,7 @@ footer .footer-brand { font-weight: 700; color: var(--text2); margin-bottom: .4r
   <div class="footer-brand">The Insur-gents · Accenture × Anthropic · Claude Code Hackathon</div>
   <div>Built with Claude Code · AWS Bedrock Opus 4.7 · Scenario 5 — Agentic Solution</div>
   <div style="margin-top:.4rem">
-    Generated 28 Apr 2026 · 12:33 UTC ·
+    Generated 28 Apr 2026 · 13:04 UTC ·
     <code>python scripts/build_presentation.py</code>
   </div>
 </footer>
